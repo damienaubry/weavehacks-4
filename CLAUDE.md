@@ -51,10 +51,12 @@ Weave is our **SCOREBOARD, not just logging.** Headline demo line: *"solo agent 
 and hallucinates; our team scores 8.5/10 with every claim traced to POS/reviews — here's the
 Weave trace."* Keep `pnpm compare` runnable after every change.
 
-> Current state: the scoreboard runs today on a **deterministic stand-in** scenario
-> (`apps/api/src/scenario.ts`, generic `record_*` reconciliation) so the harness is green from
-> minute one. It gets replaced by the real **Content → Critic** hero loop (the next build) —
-> the harness (`compareSoloVsTeam`) does NOT change, only the scenario plugged into it does.
+> Current state: the **Brigade discussion team is live** (`pnpm prep`) — real LLM agents
+> (Chef/Historian/Scout/Prep) coordinating on a "prep for Friday" turn over W&B Inference, with
+> tools + every turn traced in Weave. The numeric **solo-vs-team eval** over this team is the next
+> step (deferred for now); until then the `compare`/`demo` scoreboard runs on a deterministic
+> stand-in scenario (`apps/api/src/scenario.ts`, generic `record_*`) so the harness stays green.
+> When we wire the eval, `compareSoloVsTeam` does NOT change — only the scenario plugged in does.
 
 ---
 
@@ -93,20 +95,32 @@ traced in Weave. This loop is the demo's spine. Everything else is additive.
 
 ---
 
-## AGENT ROSTER (hero loop first, then breadth — all of breadth is cuttable)
+## AGENT ROSTER
 
-- **Chef** (orchestrator): receives requests, delegates to stations.
-- **Prep**: predicts rush-hour demand from POS history + weather → prep sheet.
-- **Promo**: finds slow periods → targeted offers.
-- **Content** (HERO): data-grounded social posts. Build first, with Critic.
-- **Reviews**: analyzes Google reviews (Redis vector search) → insights.
-- **Critic** (HERO): scores EVERY agent output 1–10 + specific feedback. Build first.
-- **Forge** (meta-agent, STRETCH/CODA only): detects a capability gap, scaffolds a NEW agent.
-  Demo as a 15-second "and it can grow new agents" coda — do NOT let it compete with the
-  Critic loop for airtime.
+**Starting team — BUILT and running (`pnpm prep`):** the "Friday prep" discussion.
+- **Chef** (orchestrator): receives the request, delegates, presents, escalates big swings (HITL).
+- **Historian**: reads POS history via tools — the typical night + how past conditions moved demand.
+- **Scout**: reads today's real-world conditions via tools — weather, games, holidays, local events.
+- **Prep**: reconciles Historian (baseline) vs Scout (today) into ONE grounded prep sheet.
 
-Each agent's role + its conflict/dependency live as data in `packages/agents/src/roles.ts`.
-If an agent has no conflict listed there, it doesn't ship.
+  The conflict that earns the multi-agent setup: Historian's *average* Friday vs Scout's "*this*
+  Friday is rain + a PSG derby + a school holiday + a transport strike." A solo agent picks one
+  lens and is wrong; the team surfaces the contradiction and Prep reconciles it.
+
+**Next layer (additive, cuttable):**
+- **Content** + **Critic**: data-grounded social post; Critic scores 1–10 and BLOCKS until grounded
+  (the 5→8.5 jump — the eventual scoreboard star).
+- **Promo**: slow periods → targeted offers.  **Reviews**: review vector search → insights.
+- **Forge** (coda): detects a capability gap, scaffolds a NEW agent. 15-second coda only.
+
+Each agent's role + its conflict/dependency live as data in `packages/agents/src/roles.ts`
+(`assertEveryRoleHasConflict()` enforces it). If an agent has no conflict listed, it doesn't ship.
+
+> **Tools, not hardcoded prompts.** Agents reach data ONLY through parameterized tools
+> (`packages/agents/src/tools/`), driven by the runtime's chat-completions tool loop
+> (`runToolAgent`, model-agnostic). Every tool call is a Weave op, so each claim is traceable to
+> the exact query that grounded it. The Scout's tools are the four realtime signals (weather,
+> games, holidays, events); the Historian's are the POS analytics (baseline + by-condition).
 
 ## SELF-IMPROVEMENT (3 layers — Layer 1 is the hero, 2 and 3 are bonus)
 
@@ -178,12 +192,14 @@ revisit either, STOP and ask the team first.
 pnpm dev          # turbo dev: web (:3000) + api (:3001)
 pnpm health       # Redis ping + Weave hello-world (also: GET /health on the api)
 pnpm seed         # load + validate the curated seed slice (no LLM, no credits)
-pnpm baseline     # run the SOLO agent alone (watch it fail)
-pnpm compare      # THE SCOREBOARD: solo vs team, numeric delta (also: GET /compare)
-pnpm demo         # narrated 3-min demo: catch contradiction → resolve/escalate → the number
+pnpm prep         # ⭐ the Brigade discussion: Chef→Historian+Scout→Prep, live (real LLMs, traced)
+pnpm baseline     # run the SOLO agent alone (deterministic stand-in scenario)
+pnpm compare      # the stand-in scoreboard: solo vs team, numeric delta (also: GET /compare)
+pnpm demo         # narrated stand-in demo: catch contradiction → resolve/escalate → the number
 pnpm ask "..."    # one-off free-form prompt through the configured runtime (spends credits)
 pnpm --filter @weavehacks/api models       # list runtime model ids your key can use
-pnpm --filter @weavehacks/api agent:check  # prove the runtime end-to-end (spends a little credit)
+pnpm --filter @weavehacks/api agent:check  # prove a single agent run (spends a little credit)
+pnpm --filter @weavehacks/api tool:check   # prove tool-calling works on the model (a little credit)
 pnpm typecheck    # turbo typecheck (tsc --noEmit) across all packages
 pnpm build        # turbo build (next build for web; typecheck gate for packages)
 pnpm format       # prettier
@@ -209,17 +225,20 @@ build step — `tsx` runs the api, Next transpiles the web).
   ways, traces both, returns `{ solo, team, delta }`.
 - **`packages/runtime`** — inference. OpenAI-compatible client(s) for **OpenAI** and
   **W&B Inference**, switchable via `RUNTIME_PROVIDER` (default `wandb`, per the resolved
-  decision). `generate()`/`reason()` are the raw chat-completions path; `runAgent()`/
-  `reasonAgent()` are the OpenAI Agents SDK path. `describeRuntime()` reports config without
-  spending credits.
-- **`packages/agents`** — one module per restaurant role (chef, prep, promo, content, reviews,
-  critic, forge). `roles.ts` is the framework-neutral manifest: each role's authority + its
-  required conflict/dependency. Agent `act()` implementations drop in after the framework
-  decision. **DOMAIN lives here, not in the core.**
+  decision). `generate()`/`reason()` = raw chat completions; `runToolAgent()` = the tool-calling
+  loop (model-agnostic function-calling — what the Brigade agents run on); `runAgent()` = the
+  OpenAI Agents SDK path. `describeRuntime()` reports config without spending credits.
+- **`packages/agents`** — **DOMAIN lives here.** `roles.ts` is the manifest (authority + required
+  conflict per role). `tools/` are the parameterized, Weave-traced tools agents call —
+  `history.ts` (POS analytics: baseline, by-condition) + `realtime.ts` (the four signals + menu).
+  `stations.ts` defines the four LLM agents (Chef/Historian/Scout/Prep) on `runToolAgent`.
+  `discussion.ts` = `runFridayPrep()`, the coordination loop (one Weave span). Content/Critic/
+  Promo/Reviews/Forge are next.
 - **`packages/truth`** — **CANON.** Canonical restaurant data (menu, prices, hours) + schema.
   The single source of truth conflicts resolve toward.
-- **`packages/seed`** — curated demo slice (orders, reviews, one weekend's weather), editable
-  for staging the demo. Derived, NOT canon.
+- **`packages/seed`** — curated demo slice, split into editable files: `orders` (POS history),
+  `weather`, `fixtures`, `holidays`, `events` (the four realtime signals), `reviews`. `TARGET_DATE`
+  is the Friday the team preps for. Derived, NOT canon.
 - **`packages/memory`** — Redis: performance scores, Critic feedback, review vector search,
   Forge gap log, agent blueprints (Layers 2 & 3 of self-improvement).
 - **`packages/shared`** — `createRedis()`, `loadRootEnv()`, cross-cutting types (`Scoreboard`,

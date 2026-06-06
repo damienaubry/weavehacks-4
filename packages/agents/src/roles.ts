@@ -10,7 +10,16 @@
  * wins conflicts. The Critic is deliberately HIGH — it can block a producer until grounded.
  */
 
-export type Station = "chef" | "prep" | "promo" | "content" | "reviews" | "critic" | "forge";
+export type Station =
+  | "chef"
+  | "historian"
+  | "scout"
+  | "prep"
+  | "promo"
+  | "content"
+  | "reviews"
+  | "critic"
+  | "forge";
 
 export interface RoleManifest {
   id: Station;
@@ -50,11 +59,33 @@ export const AGENT_ROLES: RoleManifest[] = [
     tier: "hero",
   },
   {
+    id: "historian",
+    name: "Historian",
+    does: "Reads POS history — what a typical day looks like, and how past conditions moved demand.",
+    authority: 55,
+    conflictsWith: [{ with: "scout", over: "its baseline average vs the Scout's claim that today is atypical" }],
+    sensitive: false,
+    tier: "hero",
+  },
+  {
+    id: "scout",
+    name: "Scout",
+    does: "Reads today's real-world conditions — weather, games, holidays, local events.",
+    authority: 58,
+    conflictsWith: [{ with: "historian", over: "today's specific conditions vs the historical average" }],
+    sensitive: false,
+    tier: "hero",
+  },
+  {
     id: "prep",
     name: "Prep",
-    does: "Predicts rush-hour demand from POS history + weather → prep sheet.",
+    does: "Reconciles Historian (baseline) + Scout (today) into ONE concrete prep sheet.",
     authority: 60,
-    conflictsWith: [{ with: "critic", over: "every demand claim must trace to POS/weather" }],
+    conflictsWith: [
+      { with: "historian", over: "refuses a flat historical average when today is abnormal" },
+      { with: "scout", over: "tempers raw 'today is unusual' against what history actually supports" },
+      { with: "critic", over: "every demand number must trace to a tool result" },
+    ],
     sensitive: false,
     tier: "hero",
   },

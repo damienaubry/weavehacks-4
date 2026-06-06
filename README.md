@@ -38,7 +38,7 @@ CHEF   → presents prep sheet + approved post (HITL before anything publishes)
 | `packages/orchestration` | Domain-agnostic core: roles, coordination loop, conflict resolution (highest authority wins; sensitive → human). |
 | `packages/observability` | W&B Weave wrapper + the **solo-vs-team scoreboard** (`compareSoloVsTeam`). |
 | `packages/runtime` | Inference: OpenAI + W&B Inference (OpenAI-compatible, switchable). |
-| `packages/agents` | The Brigade roster (chef/prep/promo/content/reviews/critic/forge). Domain lives here. |
+| `packages/agents` | The Brigade roster + their tools + the discussion loop. Starting team: Chef/Historian/Scout/Prep. Domain lives here. |
 | `packages/truth` | **CANON** — menu, prices, hours. The source of truth conflicts resolve toward. |
 | `packages/seed` | Curated demo slice (orders, reviews, weather). Pitch credibility, not canon. |
 | `packages/memory` | Redis: scores, Critic feedback, review vector search, Forge gap log. |
@@ -57,13 +57,18 @@ Or manually:
 ```bash
 pnpm install
 pnpm seed           # validate the curated seed slice (no keys, no credits)
+pnpm prep           # ⭐ the Brigade discussion: Chef → Historian + Scout → Prep, live (real LLMs, traced)
 pnpm dev            # web (:3000) + api (:3001)
 pnpm health         # Redis ping + Weave hello-world
-pnpm baseline       # run the SOLO agent alone (watch it fail)
-pnpm compare        # THE SCOREBOARD: solo vs team, numeric delta
-pnpm demo           # narrated demo: catch the contradiction, resolve/escalate, the number
-pnpm --filter @weavehacks/api agent:check   # prove the runtime end-to-end (spends a little credit)
+pnpm compare        # stand-in scoreboard: solo vs team, numeric delta
+pnpm demo           # narrated stand-in demo: catch the contradiction, resolve/escalate, the number
 ```
+
+`pnpm prep` is the live multi-agent moment: the **Historian** sets the baseline from POS history,
+the **Scout** flags that the target Friday is rain + a PSG derby + a school holiday + a transport
+strike, the Historian **reacts** by pulling the matching conditional history, **Prep** reconciles
+it into a grounded prep sheet, and the **Chef** flags the big swings for owner sign-off — every
+number traced in Weave to the tool call that produced it.
 
 Requirements: Node 20+, pnpm, Docker (for Redis; otherwise bring your own `REDIS_URL`). Copy
 `.env.example` → `.env`. Runtime agents use OpenAI and/or W&B Inference; Weave needs
@@ -85,7 +90,8 @@ keys at all.**
 
 ## Status
 
-Project **decided: Brigade.** Implementation choices resolved: **W&B Inference** runtime
-(OpenAI fallback) + the **direct-call orchestrator** (no LangGraph/CopilotKit). The shared
-spine is built and the deterministic stand-in scoreboard is green (solo 60% → team 100%).
-**Next: implement the Content → Critic hero loop.**
+Project **decided: Brigade.** Stack resolved: **W&B Inference** runtime (OpenAI fallback) + a
+**direct-call orchestrator** (no LangGraph/CopilotKit). Built so far: the shared spine + the
+**starting discussion team** (Chef / Historian / Scout / Prep) running live on real LLMs with
+parameterized, Weave-traced tools (`pnpm prep`). **Next: Content + Critic, then the numeric
+solo-vs-team eval over the team.**

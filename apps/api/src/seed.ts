@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { loadRootEnv } from "@weavehacks/shared";
 import { TRUTH } from "@weavehacks/truth";
-import { seedSummary } from "@weavehacks/seed";
+import { seedSummary, TARGET_DATE } from "@weavehacks/seed";
 
 loadRootEnv();
 
@@ -26,8 +26,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   console.log(`POS orders       : ${r.orders}`);
   console.log(`reviews          : ${r.reviews}`);
   console.log(`weather days     : ${r.weatherDays}`);
+  console.log(`fixtures         : ${r.fixtures}`);
+  console.log(`holidays         : ${r.holidays}`);
+  console.log(`local events     : ${r.events}`);
+  console.log(`target date      : ${TARGET_DATE} (the Friday the team preps for)`);
   console.log(`grounding stat   : ${r.pctFiveStarMentionBroth}% of 5★ reviews mention the broth`);
-  const ok = r.menuItems > 0 && r.orders > 0 && r.reviews > 0;
+  const ok = r.menuItems > 0 && r.orders > 0 && r.weatherDays > 0;
   console.log(ok ? "\n✓ seed slice loaded" : "\n✗ seed slice incomplete — fill packages/seed + packages/truth");
   process.exit(ok ? 0 : 1);
 }

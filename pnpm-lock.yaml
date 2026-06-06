@@ -26,6 +26,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@weavehacks/agents':
+        specifier: workspace:*
+        version: link:../../packages/agents
       '@weavehacks/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -82,6 +85,9 @@ importers:
 
   packages/agents:
     dependencies:
+      '@weavehacks/observability':
+        specifier: workspace:*
+        version: link:../observability
       '@weavehacks/orchestration':
         specifier: workspace:*
         version: link:../orchestration

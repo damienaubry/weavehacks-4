@@ -7,6 +7,13 @@ export {
   type GenerateOptions,
 } from "./client";
 export { configureAgents, runAgent, reasonAgent, type RunAgentOptions } from "./agents";
+export {
+  runToolAgent,
+  type ToolSpec,
+  type ToolCallRecord,
+  type ToolAgentOptions,
+  type ToolAgentResult,
+} from "./tools";
 export { parseJsonLoose } from "./json";
 export {
   getProviders,

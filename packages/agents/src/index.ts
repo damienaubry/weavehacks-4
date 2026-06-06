@@ -1,12 +1,12 @@
 /**
- * @weavehacks/agents — the Brigade roster (DOMAIN lives here, not in the core).
+ * @weavehacks/agents — the Brigade roster (DOMAIN code lives here, not in the core).
  *
- * Today this exports the role MANIFEST only (see roles.ts). The agent `act()` implementations
- * — chef/prep/promo/content/reviews/critic/forge, each built on @weavehacks/runtime and wired
- * into @weavehacks/orchestration (the resolved direct-call orchestrator) — drop in next.
+ * Starting team: Chef (orchestrator) + Historian (past patterns) + Scout (today's conditions)
+ * + Prep (reconciler). They coordinate in `runFridayPrep()` — the Historian's baseline and the
+ * Scout's read of today disagree, and Prep reconciles. Built on the resolved direct-call
+ * orchestrator + W&B Inference runtime; every agent call and tool call is a Weave op.
  *
- * BUILD ORDER (non-negotiable): the HERO LOOP first — Prep → Content → Critic → rewrite →
- * visible 5→8.5 jump, traced in Weave — before Promo, Reviews, or Forge.
+ * Content / Critic / Promo / Reviews / Forge are next, additive, and cuttable.
  */
 
 export {
@@ -16,3 +16,28 @@ export {
   type RoleManifest,
   type Station,
 } from "./roles";
+
+export { STATIONS, runStation, type StationConfig, type StationRun } from "./stations";
+export {
+  runFridayPrep,
+  type DiscussionResult,
+  type DiscussionTurn,
+  type DiscussionOptions,
+} from "./discussion";
+
+export {
+  HISTORY_TOOLS,
+  REALTIME_TOOLS,
+  MENU_TOOLS,
+  getWeatherTool,
+  getGamesTool,
+  getHolidaysTool,
+  getEventsTool,
+  getMenuTool,
+  demandBaselineTool,
+  demandByConditionTool,
+  ordersOnTool,
+  demandBaseline,
+  demandByCondition,
+  ordersOn,
+} from "./tools";

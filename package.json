@@ -15,6 +15,7 @@
     "ask": "pnpm --filter @weavehacks/api ask",
     "health": "pnpm --filter @weavehacks/api health",
     "seed": "pnpm --filter @weavehacks/api seed",
+    "prep": "pnpm --filter @weavehacks/api prep",
     "baseline": "pnpm --filter @weavehacks/api baseline",
     "compare": "pnpm --filter @weavehacks/api compare",
     "demo": "pnpm --filter @weavehacks/api demo",
