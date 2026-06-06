@@ -26,6 +26,10 @@ import { FIXTURES } from "./fixtures";
 import { HOLIDAYS } from "./holidays";
 import { EVENTS } from "./events";
 
+// Real Le Kyoto POS daily-service records + train/holdout split (the forecast data contract).
+// (The `Order` line type lives in ./types and is re-exported above, so no duplicate here.)
+export * from "./pos";
+
 /**
  * The date the demo asks the team to prep for: a Friday that is rain + a PSG derby + a school
  * holiday + an RER strike — i.e. NOT an average Friday. This is what makes the Historian's
