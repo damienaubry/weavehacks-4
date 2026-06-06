@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "WeaveHacks 4 — multi-agent spine",
-  description: "Neutral demo shell. Project A or B is undecided.",
+  title: "Brigade — multi-agent restaurant ops",
+  description: "Le Kyoto's kitchen brigade of AI agents. Solo agent vs. agent team, scored in Weave.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

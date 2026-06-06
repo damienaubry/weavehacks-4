@@ -1,16 +1,18 @@
 import type { Agent, Claim } from "@weavehacks/orchestration";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NEUTRAL PLACEHOLDER SCENARIO — fully domain-agnostic.
+// DETERMINISTIC STAND-IN SCENARIO — domain-agnostic on purpose.
 //
-// It exists so the solo-vs-team SCOREBOARD is runnable from minute one, and it
-// demonstrates the exact judged thesis WITHOUT committing to Project A or B:
-// generic agents make conflicting claims about generic `record_*` keys; a solo
-// agent applies them blindly (last-write-wins) and ends up WRONG, while the team
-// detects the contradiction, resolves by authority, and escalates a sensitive one.
+// It exists so the solo-vs-team SCOREBOARD is green from minute one and demonstrates
+// the judged thesis without spending a credit: generic agents make conflicting claims
+// about generic `record_*` keys; a solo agent applies them blindly (last-write-wins)
+// and ends up WRONG, while the team detects the contradiction, resolves by authority,
+// and escalates the sensitive one to a human.
 //
-// REPLACE THIS after the A/B decision with the chosen project's real scenario
-// (restaurant truth/surfaces, OR vector store/retrieval). Keep names generic here.
+// SWAP THIS for Brigade's real scoreboard — the Content → Critic hero loop (solo
+// writes an ungrounded post ≈5/10; the team grounds it in POS/reviews ≈8.5/10). The
+// harness stays identical; only this file changes. Keep restaurant nouns OUT of the
+// orchestration/observability core; they belong in packages/agents|truth|seed.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The single source of truth this scenario is scored against. */

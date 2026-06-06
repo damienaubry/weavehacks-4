@@ -1,5 +1,5 @@
 {
-  "name": "@weavehacks/project-b",
+  "name": "@weavehacks/agents",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,6 +12,12 @@
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@weavehacks/orchestration": "workspace:*",
+    "@weavehacks/runtime": "workspace:*",
+    "@weavehacks/seed": "workspace:*",
+    "@weavehacks/truth": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

@@ -8,9 +8,9 @@ loadRootEnv();
 const PORT = Number(process.env.PORT ?? 3001);
 
 /**
- * Orchestration runtime entrypoint. Neutral on purpose — exposes the spine's
- * cross-cutting endpoints (health + scoreboard). Project-specific routes get added
- * after the A/B decision.
+ * Brigade — orchestration runtime entrypoint. Exposes the spine's cross-cutting
+ * endpoints (health + scoreboard). The hero-loop routes (Prep/Content/Critic) get
+ * added next, on the direct-call orchestrator + W&B Inference runtime.
  */
 const server = http.createServer(async (req, res) => {
   res.setHeader("content-type", "application/json");
@@ -33,8 +33,8 @@ const server = http.createServer(async (req, res) => {
       res.end(
         JSON.stringify(
           {
-            name: "weavehacks-4 · orchestration runtime",
-            project: "UNDECIDED (A or B) — see CLAUDE.md",
+            name: "Brigade · orchestration runtime",
+            project: "Brigade — multi-agent restaurant ops for Le Kyoto (see CLAUDE.md)",
             endpoints: ["/health", "/compare"],
           },
           null,

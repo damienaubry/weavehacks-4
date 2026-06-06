@@ -59,7 +59,7 @@ export default function Home() {
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
         <div>
           <p style={{ color: "var(--warn)", fontSize: 12, letterSpacing: 1, textTransform: "uppercase", margin: 0 }}>
-            Project A or B — undecided · neutral scenario
+            Brigade · Le Kyoto · stand-in scenario
           </p>
           <h1 style={{ fontSize: 30, margin: "6px 0 2px", lineHeight: 1.1 }}>Single agent vs. agent team</h1>
           <p style={{ color: "var(--muted)", fontSize: 15, marginTop: 0 }}>
@@ -129,8 +129,8 @@ export default function Home() {
         <a href="https://wandb.ai" target="_blank" rel="noreferrer">
           open dashboard
         </a>
-        . CLI: <code>pnpm compare</code>, <code>pnpm demo</code>. Scenario is a neutral placeholder
-        (generic <code>record_*</code> keys); it's replaced by the real one once we pick A or B.
+        . CLI: <code>pnpm compare</code>, <code>pnpm demo</code>. Scenario is a deterministic
+        stand-in (generic <code>record_*</code> keys); it's replaced by the Content → Critic hero loop next.
       </footer>
     </main>
   );

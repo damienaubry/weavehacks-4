@@ -1,147 +1,233 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-> These are operating instructions to yourself, not a repo brochure. Read the STATUS and
-> OPEN DECISIONS first — the project is **not chosen**, and most project-specific work is
-> blocked until it is.
-
----
-
-## STATUS: WE HAVE NOT CHOSEN THE PROJECT YET
-
-We are deciding between two projects, A and B. They are EQUAL candidates right now.
-Do NOT assume one. Your job in this setup pass is to build ONLY the shared spine
-that both need, and then STOP and ask us which one we picked before building
-anything project-specific.
-
-**Project A — Restaurant truth-sync (service-as-software).** A multi-agent system that keeps
-a restaurant's digital presence consistent against a SINGLE SOURCE OF TRUTH (owner-loaded:
-menu, prices, hours, available dishes). External surfaces (Google Maps, social, delivery apps,
-the site) drift; a solo agent updates one and silently leaves the others broken. Agents with
-distinct roles (inventory, marketing, presence-sync, verifier, orchestrator) MUST coordinate
-because their outputs contradict (Marketing wants to promote a dish Inventory knows is sold
-out). Conflict rule: the agent closest to the source of truth wins; money/reputation changes
-escalate to a human.
-
-**Project B — Self-improving agent over a vector DB ("ruvector").** A team of agents debates
-and improves a vector database / retrieval agent over time. The orchestration IS agents
-reasoning about how to improve store/retrieval quality. (Thesis still needs sharpening — see
-OPEN DECISION #2.)
-
-**What's COMMON (already built — the shared spine):** the domain-agnostic multi-agent core
-(roles, coordination loop, conflict/decision resolution), Weave as a SCOREBOARD (instrument
-every agent call + every resolution; a solo-vs-team comparison harness that reports a numeric
-difference), Redis for shared state + pub/sub, the monorepo, one-command setup, env, health checks.
-
-**What is PROJECT-SPECIFIC (do NOT build until we choose):** any domain model, any
-domain-tied agent roles, any UI beyond a neutral shell. These live as empty placeholders in
-`packages/_project-a` and `packages/_project-b` with a TODO until the decision is made.
-
-### The thesis (applies to whichever we pick — this is what gets judged)
-- Multi-agent only earns its place when a SOLO agent visibly fails and a coordinated team
-  visibly succeeds, and we can prove it with numbers in Weave.
-- Coordination only matters when there's a real CONFLICT to resolve. No decorative parallel agents.
-- The demo's star is the moment the system catches a contradiction and resolves it (or
-  escalates). Build toward showing that in 3 minutes.
-- Whichever project we choose must produce a "solo scores X, team scores Y" number by Saturday night.
+This file is operating instructions to yourself, not a repo brochure. Read the THESIS first.
+The project IS decided (Brigade) and the two implementation choices (runtime provider,
+orchestration framework) are now RESOLVED (see below). Next up: build the Content → Critic
+HERO LOOP.
 
 ---
 
-## OPEN DECISIONS — do NOT pick these for us. Scaffold neutrally and ASK before hardcoding.
+## WHAT WE'RE BUILDING: Brigade
 
-1. **PROJECT CHOICE: A or B.** Not decided. This is the big one — most project-specific
-   work is blocked on it.
-2. **(If B) Sharpen the thesis:** what exactly does a solo agent get WRONG about improving
-   the vector DB that a team gets right? If we can't answer this, B is weaker than A.
-3. **RUNTIME PROVIDER — RESOLVED (2026-06-06):** Runtime LLM = **W&B Inference**
-   (OpenAI-compatible, base URL `https://api.inference.wandb.ai/v1`), authenticated with the
-   **same W&B API key** that powers Weave — so the granted W&B Inference credits fund the
-   product agents. OpenAI proper is a switchable fallback (`RUNTIME_PROVIDER=openai`). Model
-   id via `WANDB_INFERENCE_MODEL` (discover with the `models` command). Optional
-   `WANDB_PROJECT` ("entity/project") sets the `openai-project` usage header. Role-based
-   routing still lives in `providerForRole()` if we later want a cheaper model per role.
-   _(Cursor was evaluated and dropped: the SDK needs a paid/usage-billed Cursor plan, which
-   we don't have — `@cursor/sdk` and its native sqlite3 build were removed.)_
-4. **AGENT FRAMEWORK — RESOLVED (2026-06-06):** **OpenAI Agents SDK** (`@openai/agents`),
-   pointed at W&B Inference via `setDefaultOpenAIClient` + `setOpenAIAPI('chat_completions')`.
-   Its built-in tracing is DISABLED (`setTracingDisabled(true)`) — it would upload to OpenAI
-   and need an OpenAI key; we trace with Weave. A product agent is `runtime.runAgent({ name,
-   instructions, input })` (or `reasonAgent` for JSON). The orchestration core is
-   framework-agnostic, so domain agents drop straight onto this after A/B.
+A **service-as-software** multi-agent system for a REAL restaurant we operate — **Le Kyoto**,
+a small Japanese takeout/delivery spot near Paris. Named after the kitchen brigade: a head
+chef delegates to specialized stations. Specialized AI agents handle different restaurant
+operations, **every agent's output is scored by a Critic, and the system measurably improves
+from that feedback.**
 
-Still open: **#1 (A or B)** and **#2 (sharpen B's thesis, if B).**
+Grounded in real data and a real operator ("I run this restaurant, this is the system I wish
+I had"). **That founder story is a core asset — protect it.** Never let fabricated data dilute
+"this is real": seed files are clearly-marked curated slices that the operator replaces with
+the real numbers; we never pass a guess off as Le Kyoto's truth.
 
-When you hit any open decision, STOP and ask a concise question rather than guessing.
+20h hackathon (WeaveHacks 4), team of 2, all coding with AI. Optimize for a **working 3-minute
+demo**, not production.
 
 ---
 
-## Rules for any agent working here
+## THE THESIS — this is what gets judged. Never lose sight of it.
 
-- **Keep the core domain-agnostic.** `packages/orchestration` and `packages/observability`
-  must NEVER leak Project A or B concepts (no restaurant/menu/surface, no vector/retrieval terms).
-  Domain code goes in `packages/_project-a|b` only, and only after the decision.
-- **Runtime LLM = W&B Inference (spends the W&B Inference credits).** Authenticated with the
-  same `WANDB_API_KEY` as Weave; OpenAI is a switchable fallback. Do NOT make LLM calls in
-  health checks/scaffolding — no burning credits on tooling.
-- **Every agent needs a clear role and at least ONE conflict with another agent, or it doesn't
-  ship.** No decorative parallel agents.
-- **Verifier-type roles validate SEMANTICALLY**, not just "did it run?".
-- **Money/reputation (or otherwise irreversible) changes escalate to a human, never auto-apply.**
-- **Everything is instrumented in Weave.** Every agent call and every conflict resolution is a
-  traced op. The solo-vs-team comparison must stay runnable at all times.
-- **2-day hackathon:** if torn between "robust" and "demoable tomorrow," choose demoable. No
-  speculative abstractions, complex auth, multi-tenancy, elaborate CI/CD, or scheduled scanners.
-- **Integrate early, commit often.** Judges read git history as proof.
+- Multi-agent only earns its place when a **SOLO agent visibly FAILS** and a **coordinated
+  team visibly SUCCEEDS**, and we can **PROVE it with numbers in Weave**.
+- Coordination only matters when there's a real **CONFLICT** to resolve. The Critic wants
+  data-grounded, specific output; the producing agent just wants to ship. **That clash — and
+  the visible quality jump when it resolves — is the star of the demo.**
+- **No decorative agents.** Every agent needs a role AND at least one real conflict or
+  dependency with another agent, or it doesn't ship.
+- The deliverable that proves all of this: **"solo scores X, team scores Y"** in Weave, by
+  Saturday night, runnable at all times.
 
 ---
 
-## Commands
+## OBSERVABILITY + THE BASELINE COME FIRST
+
+Before any breadth, the scoreboard must exist and stay green:
+1. A **SOLO baseline** that does a task alone (e.g. writes the Instagram post in one shot).
+2. The **agent-TEAM** version (producer + Critic loop).
+3. **Weave on BOTH**, same scenario through each, reporting a numeric difference (output
+   quality score; % of claims grounded in a real data source).
+
+Weave is our **SCOREBOARD, not just logging.** Headline demo line: *"solo agent scores 5/10
+and hallucinates; our team scores 8.5/10 with every claim traced to POS/reviews — here's the
+Weave trace."* Keep `pnpm compare` runnable after every change.
+
+> Current state: the scoreboard runs today on a **deterministic stand-in** scenario
+> (`apps/api/src/scenario.ts`, generic `record_*` reconciliation) so the harness is green from
+> minute one. It gets replaced by the real **Content → Critic** hero loop (the next build) —
+> the harness (`compareSoloVsTeam`) does NOT change, only the scenario plugged into it does.
+
+---
+
+## THE HERO LOOP — build this end-to-end FIRST (Day 1, non-negotiable)
+
+The one thing worth showing deeply. A single "Friday prep" turn, exactly this shape:
+
+```
+USER: "Prep for Friday dinner."
+
+CHEF (orchestrator): Friday dinner request. Needs demand prediction + content push.
+  → delegates to Prep, then Content
+
+PREP AGENT: [pulls POS: last 8 Fridays] [pulls weather: rain, 14C]
+  "Friday 19-21h: pre-prep ~32 gyoza, ~15 shoyu ramen. Rain → cold soba drops 40%, skip it."
+  → emits prep sheet
+
+CONTENT AGENT: [reads Prep output + review highlights]
+  draft v1: "Rainy Friday? Hot ramen's calling." → emits
+
+CRITIC: [scores v1] "5/10. Generic, no data hook, no CTA. Reviews: 83% of 5-star reviews
+  mention the broth — use it." → feedback back to Content
+
+CONTENT AGENT: [rewrites with feedback]
+  draft v2: "Our 18-hour tonkotsu broth — the one 83% of you can't stop reviewing.
+  Rainy Friday, 6:30pm. Pre-order now." → emits
+
+CRITIC: [scores v2] "8.5/10. Grounded, specific, has CTA. ✅"
+
+CHEF: → presents prep sheet + approved post to user
+```
+
+What makes it real multi-agent (not one LLM in a trenchcoat): **the Critic wants something
+different than Content and BLOCKS it until grounded.** The 5→8.5 jump is visible live and fully
+traced in Weave. This loop is the demo's spine. Everything else is additive.
+
+---
+
+## AGENT ROSTER (hero loop first, then breadth — all of breadth is cuttable)
+
+- **Chef** (orchestrator): receives requests, delegates to stations.
+- **Prep**: predicts rush-hour demand from POS history + weather → prep sheet.
+- **Promo**: finds slow periods → targeted offers.
+- **Content** (HERO): data-grounded social posts. Build first, with Critic.
+- **Reviews**: analyzes Google reviews (Redis vector search) → insights.
+- **Critic** (HERO): scores EVERY agent output 1–10 + specific feedback. Build first.
+- **Forge** (meta-agent, STRETCH/CODA only): detects a capability gap, scaffolds a NEW agent.
+  Demo as a 15-second "and it can grow new agents" coda — do NOT let it compete with the
+  Critic loop for airtime.
+
+Each agent's role + its conflict/dependency live as data in `packages/agents/src/roles.ts`.
+If an agent has no conflict listed there, it doesn't ship.
+
+## SELF-IMPROVEMENT (3 layers — Layer 1 is the hero, 2 and 3 are bonus)
+
+- **Layer 1 (within session):** Critic forces rewrites until quality threshold. **THE STAR.**
+- **Layer 2 (across runs):** Redis stores scores + feedback so agents don't repeat mistakes.
+- **Layer 3 (lifetime):** Forge spawns new agents. Coda only.
+
+---
+
+## RESOLVED DECISIONS (2026-06-06) — do not re-litigate
+
+Both went to the zero-friction option to protect the 20h / 2-person window. If you want to
+revisit either, STOP and ask the team first.
+
+1. **RUNTIME PROVIDER — RESOLVED: keep W&B Inference as the day-one default**, OpenAI as a
+   switchable fallback. `RUNTIME_PROVIDER` selects `wandb` (default) or `openai`; the one W&B
+   API key powers both Weave AND W&B Inference, so the W&B credits fund the agents. If a stronger
+   model is ever needed for Critic/Chef, role-based routing lives in `providerForRole()` — but
+   only split if it maps to ROLES, and ask first.
+
+2. **ORCHESTRATION FRAMEWORK — RESOLVED: keep the direct-call orchestrator** (`packages/
+   orchestration`: `runSolo`/`runTeam` + conflict resolution) and the plain Next.js shell that
+   polls `/compare`. No LangGraph, no CopilotKit — the Critic-rewrite loop fits the direct-call
+   model directly, and the scoreboard is already green. (CopilotKit/LangGraph stay on the table
+   only as a post-hero-loop polish if time allows — ask before adopting.)
+
+---
+
+## RULES FOR ANY AGENT WORKING HERE
+
+- **Canon vs non-canon.** `packages/truth` is the ONLY source of truth (menu, prices, hours) —
+  CANON. Surface states, drafts, seed-derived outputs, and anything an agent generates are
+  DERIVED and may be stale. **Never treat a generated output as truth.** `packages/seed` is a
+  curated demo slice — credibility for the pitch, NOT canon.
+- **Every agent needs a clear role and at least ONE conflict/dependency with another agent, or
+  it doesn't ship.** No decorative parallel agents.
+- **The Critic validates SEMANTICALLY** — is the claim grounded in a real data source? — not
+  just "did it run?". Target: **0 ungrounded claims in approved output.**
+- **Anything touching money or public reputation (a live promo, a published post) requires HITL
+  approval — never auto-publish.**
+- **Build the HERO LOOP end-to-end before breadth.** Promo / Reviews / Forge are additive and
+  cuttable. Keep the solo-vs-team scoreboard runnable after every change.
+- **Everything is instrumented in Weave.** Every agent call AND every Critic scoring/rewrite is
+  a traced op. The solo-vs-team comparison stays runnable at all times.
+- **Keep the orchestration + observability core domain-agnostic.** `packages/orchestration` and
+  `packages/observability` must not leak restaurant concepts (no menu/dish/surface). Domain code
+  lives in `packages/agents`, `packages/truth`, `packages/seed`.
+- **DATA: do NOT build a pipeline.** We have real data (3yr Hiboutik POS, public Google reviews,
+  weather, menu) but the demo uses a **curated seed slice** in `packages/seed` (hardcoded). Real
+  data is PITCH CREDIBILITY, not a technical dependency. No live integrations. Make seed easy to
+  edit so we can stage the demo.
+- **Credits power RUNTIME agents, not build tooling.** OpenAI ($50) + W&B Inference ($50) fund
+  the agents *inside* Brigade. ~$123 Cursor credit is for BUILD TOOLING (coding agent), NOT
+  runtime. **Exception:** the Forge coda, if it actually WRITES a new agent's code live, is a
+  coding task — the only place Cursor credits may touch the product, and only as a Sunday stretch.
+  Never burn runtime credits in health checks / scaffolding.
+- **20h hackathon discipline (2 people):** if torn between "robust" and "demoable tomorrow," choose
+  demoable. No complex auth, multi-tenancy, elaborate CI/CD, YAML owners, scheduled scanners, or
+  speculative abstractions.
+- **Integrate early, commit often.** Judges read git history as proof we built it here. No
+  backend/frontend silos merged in the last hour.
+
+---
+
+## COMMANDS
 
 ```bash
-./start.sh        # one-command setup: tools → install → .env → Redis → health → dev
+./start.sh        # one-command setup: tools → install → .env → Redis → seed → health → dev
 pnpm dev          # turbo dev: web (:3000) + api (:3001)
 pnpm health       # Redis ping + Weave hello-world (also: GET /health on the api)
+pnpm seed         # load + validate the curated seed slice (no LLM, no credits)
 pnpm baseline     # run the SOLO agent alone (watch it fail)
 pnpm compare      # THE SCOREBOARD: solo vs team, numeric delta (also: GET /compare)
 pnpm demo         # narrated 3-min demo: catch contradiction → resolve/escalate → the number
-pnpm --filter @weavehacks/api models         # list W&B Inference model ids your key can use
-pnpm --filter @weavehacks/api agent:check   # prove the runtime end-to-end (OpenAI Agents SDK over W&B Inference)
+pnpm ask "..."    # one-off free-form prompt through the configured runtime (spends credits)
+pnpm --filter @weavehacks/api models       # list runtime model ids your key can use
+pnpm --filter @weavehacks/api agent:check  # prove the runtime end-to-end (spends a little credit)
 pnpm typecheck    # turbo typecheck (tsc --noEmit) across all packages
 pnpm build        # turbo build (next build for web; typecheck gate for packages)
 pnpm format       # prettier
 ```
 
-Run one package: `pnpm --filter @weavehacks/api <script>`. Redis runs as the
-`weavehacks-redis` docker container on `:6379`. Weave needs `WANDB_API_KEY` in `.env`;
-without it, tracing degrades to a no-op (the spine still runs).
+Run one package: `pnpm --filter @weavehacks/<name> <script>`. Redis runs as the
+`weavehacks-redis` docker container on `:6379`. Weave needs `WANDB_API_KEY` in `.env`; without
+it, tracing degrades to a no-op (the spine still runs).
 
-## Architecture
+## ARCHITECTURE
 
-pnpm + Turborepo monorepo. TypeScript ESM throughout; packages export `src/*.ts` directly
-(no build step — `tsx` runs the api, Next transpiles the web). The data flow that matters:
+pnpm + Turborepo monorepo. TypeScript ESM throughout; packages export `src/*.ts` directly (no
+build step — `tsx` runs the api, Next transpiles the web).
 
-- **`packages/orchestration`** — the domain-agnostic core. `Agent` = a `role` (with an
-  `authority`: higher = closer to the source of truth) + an `act()` that emits `Claim`s.
-  `runSolo()` applies claims last-write-wins (the failing baseline). `runTeam()` gathers
-  claims → a verifier detects conflicts → `resolveConflict()` decides: **highest authority
-  wins; `sensitive` claims escalate to a human instead of auto-applying.** `SharedState` is
-  Redis-backed (`createSharedState`) with an in-memory fallback so runs work offline.
-- **`packages/observability`** — `initWeave()` + `traced()` (defensive: no-ops without a key)
-  wrap every agent call/resolution. `compareSoloVsTeam()` is the scoreboard: runs the same
-  scenario two ways, traces both, returns `{ solo, team, delta }`.
-- **`packages/runtime`** — inference. Default = **W&B Inference** via the **OpenAI Agents
-  SDK** (`runAgent` / `reasonAgent` in agents.ts; the SDK is pointed at W&B's base URL with
-  `setDefaultOpenAIClient` + chat-completions, and its own tracing is disabled in favor of
-  Weave). `generate()` / `reason()` (client.ts) are the lighter raw chat-completions path.
-  OpenAI is switchable via `RUNTIME_PROVIDER`. `describeRuntime()` reports config without spending credits.
-- **`packages/shared`** — `createRedis()`, `loadRootEnv()` (walks up to the workspace root),
-  and cross-cutting types (`Scoreboard`, `RunResult`).
+- **`packages/orchestration`** — domain-agnostic core. `Agent` = a `role` (with `authority`:
+  higher = closer to the source of truth) + an `act()` that emits `Claim`s. `runSolo()` applies
+  claims last-write-wins (the failing baseline). `runTeam()` gathers claims → a verifier detects
+  conflicts → `resolveConflict()` decides: **highest authority wins; `sensitive` claims escalate
+  to a human.** `SharedState` is Redis-backed with an in-memory fallback. (The Critic-rewrite
+  loop is modeled here too once we build it — keep it generic.)
+- **`packages/observability`** — `initWeave()` + `traced()` (no-ops without a key) wrap every
+  agent call/resolution. `compareSoloVsTeam()` is the scoreboard: runs the same scenario two
+  ways, traces both, returns `{ solo, team, delta }`.
+- **`packages/runtime`** — inference. OpenAI-compatible client(s) for **OpenAI** and
+  **W&B Inference**, switchable via `RUNTIME_PROVIDER` (default `wandb`, per the resolved
+  decision). `generate()`/`reason()` are the raw chat-completions path; `runAgent()`/
+  `reasonAgent()` are the OpenAI Agents SDK path. `describeRuntime()` reports config without
+  spending credits.
+- **`packages/agents`** — one module per restaurant role (chef, prep, promo, content, reviews,
+  critic, forge). `roles.ts` is the framework-neutral manifest: each role's authority + its
+  required conflict/dependency. Agent `act()` implementations drop in after the framework
+  decision. **DOMAIN lives here, not in the core.**
+- **`packages/truth`** — **CANON.** Canonical restaurant data (menu, prices, hours) + schema.
+  The single source of truth conflicts resolve toward.
+- **`packages/seed`** — curated demo slice (orders, reviews, one weekend's weather), editable
+  for staging the demo. Derived, NOT canon.
+- **`packages/memory`** — Redis: performance scores, Critic feedback, review vector search,
+  Forge gap log, agent blueprints (Layers 2 & 3 of self-improvement).
+- **`packages/shared`** — `createRedis()`, `loadRootEnv()`, cross-cutting types (`Scoreboard`,
+  `RunResult`).
 - **`apps/api`** — orchestration runtime entrypoint. HTTP `/health` + `/compare`, and the
-  `baseline`/`compare`/`demo` CLI scripts. `src/scenario.ts` is a **NEUTRAL placeholder**
-  scenario (generic `record_*` keys) so the scoreboard runs from minute one; it gets replaced
-  by the chosen project's real scenario after the A/B decision.
-- **`apps/web`** — neutral Next.js shell. A "Run scoreboard" button hits the api. No domain UI.
+  `baseline`/`compare`/`demo`/`seed`/`ask` CLI scripts.
+- **`apps/web`** — dashboard: the Critic score jump, live agent cards, HITL approve/reject.
+  Plain Next.js polling `/compare` (direct-call orchestrator, per the resolved decision).
 
-The whole point: orchestration + observability are the reusable spine; the placeholder scenario
-proves the thesis (solo 60% → team 100%) without committing to A or B.
+The point: orchestration + observability are the reusable spine; the agents/truth/seed/memory
+packages are Brigade; the scoreboard proves the thesis (solo → team) after every change.

@@ -1,7 +1,6 @@
 /**
- * Shared, domain-agnostic types. NOTHING project-specific (no restaurant or
- * vector-DB concepts) belongs here — those live in packages/_project-a|b once
- * the A/B decision is made.
+ * Shared, domain-agnostic types. NOTHING restaurant-specific (menu/dish/surface)
+ * belongs here — domain types live in packages/agents|truth|seed.
  */
 
 /** A numeric scoreboard from a solo-vs-team comparison run. */

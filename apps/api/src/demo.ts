@@ -10,13 +10,14 @@ const pct = (n: number) => `${((n as number) * 100).toFixed(0)}%`;
 /**
  * The 3-minute demo, in text. The star is the moment the team CATCHES a contradiction
  * and resolves/escalates it — and the scoreboard proves it with a number.
- * (Neutral placeholder scenario; gets swapped for the real one after the A/B decision.)
+ * (Deterministic stand-in scenario; gets swapped for the real Content → Critic hero
+ * loop next — the harness stays identical.)
  */
 export async function runDemo(): Promise<void> {
   await initWeave();
 
   console.log("\n──────────────────────────────────────────────────────────");
-  console.log(" WeaveHacks 4 · multi-agent spine · NEUTRAL demo scenario");
+  console.log(" Brigade · multi-agent spine · stand-in demo scenario");
   console.log("──────────────────────────────────────────────────────────");
 
   const solo = await soloRun();
@@ -41,8 +42,8 @@ export async function runDemo(): Promise<void> {
   const delta = (team.score as number) - (solo.score as number);
   console.log(`\n[3] THE NUMBER`);
   console.log(`    solo ${pct(solo.score)}  →  team ${pct(team.score)}   (delta ${delta >= 0 ? "+" : ""}${(delta * 100).toFixed(0)} pts)`);
-  console.log("    ^ this is what gets judged. Replace the scenario with the real");
-  console.log("      one once we pick A or B — the harness stays identical.\n");
+  console.log("    ^ this is what gets judged. Swap in the real Content → Critic hero");
+  console.log("      loop next — the harness (compareSoloVsTeam) stays identical.\n");
 }
 
 // Run directly: `pnpm demo`

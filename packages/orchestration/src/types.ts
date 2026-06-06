@@ -3,8 +3,8 @@
  *
  * The whole point of this package: agents with DISTINCT ROLES coordinate, and
  * when their outputs CONFLICT, a resolution mechanism decides. Nothing here knows
- * about restaurants, menus, vectors, or retrieval — keep it that way. Project A/B
- * concepts live in packages/_project-a|b.
+ * about restaurants, menus, or surfaces — keep it that way. Brigade domain code
+ * lives in packages/agents|truth|seed.
  */
 
 /** A role an agent plays. Higher `authority` = closer to the source of truth. */

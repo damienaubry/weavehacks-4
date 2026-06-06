@@ -1,5 +1,5 @@
 {
-  "name": "@weavehacks/project-a",
+  "name": "@weavehacks/memory",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,6 +12,9 @@
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@weavehacks/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

@@ -7,6 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "health": "tsx src/health.ts",
+    "seed": "tsx src/seed.ts",
     "baseline": "tsx src/baseline.ts",
     "compare": "tsx src/compare.ts",
     "demo": "tsx src/demo.ts",
@@ -21,7 +22,9 @@
     "@weavehacks/observability": "workspace:*",
     "@weavehacks/orchestration": "workspace:*",
     "@weavehacks/runtime": "workspace:*",
-    "@weavehacks/shared": "workspace:*"
+    "@weavehacks/seed": "workspace:*",
+    "@weavehacks/shared": "workspace:*",
+    "@weavehacks/truth": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

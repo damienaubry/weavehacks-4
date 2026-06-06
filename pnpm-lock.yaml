@@ -35,9 +35,15 @@ importers:
       '@weavehacks/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
+      '@weavehacks/seed':
+        specifier: workspace:*
+        version: link:../../packages/seed
       '@weavehacks/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@weavehacks/truth':
+        specifier: workspace:*
+        version: link:../../packages/truth
     devDependencies:
       '@types/node':
         specifier: ^22.10.0
@@ -74,7 +80,20 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/_project-a:
+  packages/agents:
+    dependencies:
+      '@weavehacks/orchestration':
+        specifier: workspace:*
+        version: link:../orchestration
+      '@weavehacks/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@weavehacks/seed':
+        specifier: workspace:*
+        version: link:../seed
+      '@weavehacks/truth':
+        specifier: workspace:*
+        version: link:../truth
     devDependencies:
       '@types/node':
         specifier: ^22.10.0
@@ -83,7 +102,11 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/_project-b:
+  packages/memory:
+    dependencies:
+      '@weavehacks/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@types/node':
         specifier: ^22.10.0
@@ -140,6 +163,19 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
+  packages/seed:
+    dependencies:
+      '@weavehacks/truth':
+        specifier: workspace:*
+        version: link:../truth
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.19.20
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
   packages/shared:
     dependencies:
       dotenv:
@@ -148,6 +184,15 @@ importers:
       ioredis:
         specifier: ^5.4.1
         version: 5.11.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.19.20
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/truth:
     devDependencies:
       '@types/node':
         specifier: ^22.10.0

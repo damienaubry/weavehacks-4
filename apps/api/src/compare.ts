@@ -8,7 +8,7 @@ loadRootEnv();
 
 /** Run the scoreboard: same scenario, solo vs team, numeric delta — traced in Weave. */
 export async function runCompare(): Promise<Scoreboard> {
-  return compareSoloVsTeam({ name: "neutral-reconciliation", solo: soloRun, team: teamRun });
+  return compareSoloVsTeam({ name: "brigade-standin", solo: soloRun, team: teamRun });
 }
 
 const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
@@ -18,7 +18,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   runCompare()
     .then((b) => {
       console.log("\n=== SCOREBOARD · solo vs team ===");
-      console.log(`scenario : ${b.name}  (neutral placeholder — replace after A/B decision)`);
+      console.log(`scenario : ${b.name}  (deterministic stand-in — swap in the Content → Critic hero loop)`);
       console.log(`solo     : ${pct(b.solo)}`);
       console.log(`team     : ${pct(b.team)}`);
       console.log(`delta    : ${b.delta >= 0 ? "+" : ""}${(b.delta * 100).toFixed(0)} points (team − solo)`);
