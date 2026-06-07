@@ -293,8 +293,9 @@ step — `tsx` runs the api, Next transpiles the web).
   `RecoveryRunResult`/`RecoveryReport`), `memory.ts` (failure-card stub). **To build:**
   `recovery-stations.ts` (Curator/Analyst/Writer/Verifier on `runToolAgent`), `recovery-score.ts`
   (`scoreCase`/`runRecovery` harness), `tools/policy.ts`.
-- **`packages/truth`** — **CANON.** Menu, prices, hours, **policy** (refund/gesture rules, allergen
-  disclaimers). The single source of truth conflicts resolve toward.
+- **`packages/truth`** — **CANON.** Menu, prices, hours, **policy** (`policy.ts`: refund/gesture rules,
+  allergen disclaimers + the mechanical disclosure/forbidden-claim detectors `policy_ok` reads). The
+  single source of truth conflicts resolve toward.
 - **`packages/seed`** — curated demo slice. Legacy: `orders`/`weather`/`fixtures`/`holidays`/
   `events`/`reviews`. **Recovery:** `recovery-types.ts` (the `RecoveryCase`/`IncidentType` contract)
   + `recovery-cases.ts` (placeholder; WS-A expands to ~50 real-review cases, ideally

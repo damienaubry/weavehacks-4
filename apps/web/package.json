@@ -11,7 +11,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@copilotkit/react-core": "^1.59.5",
+    "@copilotkit/react-ui": "^1.59.5",
+    "@copilotkit/runtime": "^1.59.5",
     "next": "^16.0.0",
+    "openai": "^5.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

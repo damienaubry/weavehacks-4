@@ -44,6 +44,8 @@ export {
   reviewStatsTool,
   getReviewsTool,
   reviewStats,
+  POLICY_TOOLS,
+  policyLookupTool,
 } from "./tools";
 
 // PREP station: deterministic forecasters + backtest. naiveForecast = the SOLO demand baseline;
@@ -96,3 +98,53 @@ export {
   type FailureCard,
   type RetrieveQuery,
 } from "./memory";
+
+// RECOVERY PIPELINE (WS-B) — the Curator→Analyst→Writer→Verifier hero pipeline turning ONE
+// RecoveryCase into a RecoveryOutput in three variants (solo / team / team+memory). Same model +
+// tools across all three; only orchestration differs. WS-C imports runRecoveryCase + scores it.
+export {
+  runRecoveryCase,
+  type RecoveryModels,
+  type RecoveryRunOptions,
+  type RecoveryCaseRun,
+} from "./recovery-pipeline";
+
+// The four stations + the MECHANICAL Verifier (checkGrounding + canonical POLICY helpers — no LLM
+// judge). WS-C reuses ledgerToClaims/verifyRecovery/checkPolicy so its scoring shares ONE vocabulary.
+export {
+  RECOVERY_TOOLS,
+  INCIDENT_TYPES,
+  ledgerToClaims,
+  verifyRecovery,
+  buildRecoveryCritic,
+  checkPolicy,
+  isTicketValid,
+  requiredDisclosuresFor,
+  coerceIncidentType,
+  coerceLedger,
+  coerceTicket,
+  type RecoveryVerdict,
+  type PolicyViolation,
+  type PolicyCheck,
+  type StationRunRaw,
+  type AnalystResult,
+  type WriterResult,
+  type ReviserResult,
+  type SoloResult,
+} from "./recovery-stations";
+
+// RECOVERY EVAL (WS-C) — THE judged number. scoreCase = the conjunctive, mostly-mechanical GRPR
+// (triage ∧ grounded ∧ policy ∧ ticket; grounding via checkGrounding, no LLM judge for the
+// headline). runRecoveryHarness runs solo/team/team+memory over the dataset with compute-parity
+// budgets; buildRecoveryReport shapes it into the front-end's RecoveryReport.
+export {
+  scoreCase,
+  runRecoveryHarness,
+  buildRecoveryReport,
+  judgeOverPromise,
+  type ScoreOptions,
+  type HarnessOptions,
+  type HarnessResult,
+  type CaseRunRecord,
+  type HonestComparison,
+} from "./recovery-score";

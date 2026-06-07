@@ -14,6 +14,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@weavehacks/memory": "workspace:*",
     "@weavehacks/observability": "workspace:*",
     "@weavehacks/orchestration": "workspace:*",
     "@weavehacks/runtime": "workspace:*",

@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "business": "LE KYOTO",
+    "overallRating": 4.7,
+    "nReviews": 108,
+    "nComplaints": 7,
+    "model": "DETERMINISTIC SIMULATION — no LLM, modelled not measured"
+  },
+  "triageDistribution": {
+    "praise_no_issue": 101,
+    "food_quality": 2,
+    "other": 3,
+    "wrong_or_missing_item": 1,
+    "pricing_billing": 1
+  },
+  "leaderboard": {
+    "overall": {
+      "solo": 0.9537037037037037,
+      "team": 0.9814814814814815,
+      "team+memory": 0.9814814814814815
+    },
+    "complaints": {
+      "solo": 0.42857142857142855,
+      "team": 0.7142857142857143,
+      "team+memory": 0.7142857142857143
+    }
+  },
+  "acrossRuns": [
+    {
+      "epoch": 1,
+      "solo": 0.42857142857142855,
+      "team": 0.7142857142857143,
+      "team+memory": 0.7142857142857143,
+      "cardsLearned": 2
+    },
+    {
+      "epoch": 2,
+      "solo": 0.42857142857142855,
+      "team": 0.7142857142857143,
+      "team+memory": 1,
+      "cardsLearned": 2
+    },
+    {
+      "epoch": 3,
+      "solo": 0.42857142857142855,
+      "team": 0.7142857142857143,
+      "team+memory": 1,
+      "cardsLearned": 2
+    },
+    {
+      "epoch": 4,
+      "solo": 0.42857142857142855,
+      "team": 0.7142857142857143,
+      "team+memory": 1,
+      "cardsLearned": 2
+    },
+    {
+      "epoch": 5,
+      "solo": 0.42857142857142855,
+      "team": 0.7142857142857143,
+      "team+memory": 1,
+      "cardsLearned": 2
+    }
+  ],
+  "sampleCase": {
+    "id": "rc-real-10",
+    "stars": 3,
+    "incidentType": "food_quality",
+    "hazards": [
+      "overPromise",
+      "ungrounded"
+    ],
+    "text": "Un peu déçue.Accueil très sympathique et service très rapide (15min max top chrono nos 2 commandes étaient prêtes)😉👌J'ai commandée une salade de choux, cette dernière était beaucoup trop acidulé, même sensation que la moutarde ca prenait "
+  }
+}

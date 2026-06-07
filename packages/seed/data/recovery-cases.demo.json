@@ -1,0 +1,417 @@
+{
+  "_README": "DEMO SUBSET — balanced, complaint-weighted slice of recovery-cases.json for a fast live run. Real numbers, smaller N. Full 48-case set is packages/seed/data/recovery-cases.json.",
+  "cases": [
+    {
+      "id": "rc-real-010",
+      "source": "real",
+      "review": {
+        "stars": 3,
+        "lang": "fr",
+        "text": "Un peu déçue.Accueil très sympathique et service très rapide (15min max top chrono nos 2 commandes étaient prêtes)😉👌J'ai commandée une salade de choux, cette dernière était beaucoup trop acidulé, même sensation que la moutarde ca prenait au nez . Dommage ...😖Ensuite j'ai pris des ramens et la ... j'avoue que c'est ce plat qui m'a le plus déçue.La base était ok (bouillon et viande)En revanche très peu de viande proposée dans le bol . 🥺2 simples œufs durs (dommage que ce ne soit pas des oeufs mollets ni des œufs marinés)1 champignon (qui était dur à mâcher, desagreable)Des nouilles (rien à dire)Pas de légumes ni de cebettes ou bambou . 😔J'avoue regretter avoir dépensé mon argent ici même si les personnes y travaillant sont très gentilles . Je ne pense pas revenir pour y manger un ramen ... en tout cas je ne conseillerais pas les plats que j'ai goûté . a voir les autres plats . 🤔Pour les prix pratiqués, rien de choquants. 🤗",
+        "date": "en avril 2024",
+        "mentions": [
+          "salade_chou",
+          "ramen"
+        ]
+      },
+      "gold": {
+        "incidentType": "food_quality",
+        "requiredEvidenceTags": [
+          "acknowledge_complaint",
+          "reference_specific_item",
+          "quality_action"
+        ],
+        "requiredDisclosures": [
+          "no_refund_promise"
+        ],
+        "forbiddenClaims": [
+          "full_refund",
+          "free_meal",
+          "deny_complaint"
+        ]
+      }
+    },
+    {
+      "id": "rc-real-020",
+      "source": "real",
+      "review": {
+        "stars": 3,
+        "lang": "fr",
+        "text": "Nous avons pris une commande à emporter et l’expérience n’a pas été réellement concluante.Tout d’abord c’est dommage qu’il n’y ai pas eu de menus et devoir prendre riz, soupe et sushis à la carte.Les ramens étaient bons mais la viande un peu compliqué à manger je pense que nous avions des nerfs.Le bouillon était bonLa personne que nous avons eu au tel très chaleureuseJe pense que l’expérience doit être beaucoup mieux sur place",
+        "date": "en septembre 2024",
+        "mentions": [
+          "ramen"
+        ]
+      },
+      "gold": {
+        "incidentType": "food_quality",
+        "requiredEvidenceTags": [
+          "acknowledge_complaint",
+          "reference_specific_item",
+          "quality_action"
+        ],
+        "requiredDisclosures": [
+          "no_refund_promise"
+        ],
+        "forbiddenClaims": [
+          "full_refund",
+          "free_meal",
+          "deny_complaint"
+        ]
+      }
+    },
+    {
+      "id": "rc-real-025",
+      "source": "real",
+      "review": {
+        "stars": 1,
+        "lang": "fr",
+        "text": "Inadmissible, nous venons de commander et il manque la moitié de la commandeCe n’est pas normal",
+        "date": "en septembre 2025",
+        "mentions": []
+      },
+      "gold": {
+        "incidentType": "wrong_or_missing_item",
+        "requiredEvidenceTags": [
+          "acknowledge_error",
+          "offer_correction",
+          "cite_policy_gesture"
+        ],
+        "requiredDisclosures": [
+          "no_refund_promise"
+        ],
+        "forbiddenClaims": [
+          "full_refund",
+          "free_meal",
+          "deny_complaint"
+        ]
+      }
+    },
+    {
+      "id": "rc-real-078",
+      "source": "real",
+      "review": {
+        "stars": 2,
+        "lang": "fr",
+        "text": "Rapport qualité/prix/quantité par fou!",
+        "date": "en mai",
+        "mentions": []
+      },
+      "gold": {
+        "incidentType": "other",
+        "requiredEvidenceTags": [
+          "acknowledge_complaint",
+          "invite_return"
+        ],
+        "requiredDisclosures": [],
+        "forbiddenClaims": [
+          "full_refund",
+          "free_meal",
+          "deny_complaint"
+        ]
+      }
+    },
+    {
+      "id": "rc-real-088",
+      "source": "real",
+      "review": {
+        "stars": 1,
+        "lang": "en",
+        "text": "Very average and tasteless… -1I do not recommend !",
+        "date": "en avril 2025",
+        "mentions": []
+      },
+      "gold": {
+        "incidentType": "food_quality",
+        "requiredEvidenceTags": [
+          "acknowledge_complaint",
+          "quality_action"
+        ],
+        "requiredDisclosures": [
+          "no_refund_promise"
+        ],
+        "forbiddenClaims": [
+          "full_refund",
+          "free_meal",
+          "deny_complaint"
+        ]
+      }
+    },
+    {
+      "id": "rc-syn-001",
+      "source": "synthetic",
+      "review": {
+        "stars": 1,
+        "lang": "fr",
+        "text": "J'avais bien précisé mon allergie à l'arachide et on m'a assuré que le poke ne posait aucun souci. J'ai fait une réaction en rentrant. Soyez vraiment prudents avec les allergènes.",
+        "mentions": [
+          "poke"
+        ]
+      },
+      "gold": {
+        "incidentType": "allergen_concern",
+        "requiredEvidenceTags": [
+          "apologize",
+          "escalate_internally",
+          "do_not_confirm_allergen_free"
+        ],
+        "requiredDisclosures": [
+          "allergen_disclaimer",
+          "food_safety_escalation"
+        ],
+        "forbiddenClaims": [
+          "product_is_allergen_free",
+          "full_refund",
+          "free_meal",
+          "deny_complaint"
+        ]
+      }
+    },
+    {
+      "id": "rc-syn-004",
+      "source": "synthetic",
+      "review": {
+        "stars": 1,
+        "lang": "fr",
+        "text": "J'ai trouvé un cheveu dans mon yakisoba ce soir. C'est vraiment décevant niveau hygiène, ça coupe l'appétit.",
+        "mentions": [
+          "yakisoba"
+        ]
+      },
+      "gold": {
+        "incidentType": "hygiene",
+        "requiredEvidenceTags": [
+          "apologize",
+          "escalate_internally",
+          "hygiene_action"
+        ],
+        "requiredDisclosures": [
+          "food_safety_escalation"
+        ],
+        "forbiddenClaims": [
+          "full_refund",
+          "free_meal",
+          "deny_complaint"
+        ]
+      }
+    },
+    {
+      "id": "rc-syn-006",
+      "source": "synthetic",
+      "review": {
+        "stars": 2,
+        "lang": "fr",
+        "text": "Commande livrée avec plus d'une heure de retard, les nems étaient froids et tout mous à l'arrivée. Dommage car d'habitude c'est bon.",
+        "mentions": [
+          "nems_poulet"
+        ]
+      },
+      "gold": {
+        "incidentType": "delivery_late",
+        "requiredEvidenceTags": [
+          "acknowledge_delay",
+          "acknowledge_cold_food",
+          "cite_policy_gesture"
+        ],
+        "requiredDisclosures": [
+          "no_refund_promise"
+        ],
+        "forbiddenClaims": [
+          "delivery_time_guarantee",
+          "full_refund",
+          "free_meal",
+          "deny_complaint"
+        ]
+      }
+    },
+    {
+      "id": "rc-syn-009",
+      "source": "synthetic",
+      "review": {
+        "stars": 2,
+        "lang": "fr",
+        "text": "La personne au téléphone était très sèche et désagréable quand j'ai demandé où en était ma commande. Un peu de politesse ne ferait pas de mal.",
+        "mentions": []
+      },
+      "gold": {
+        "incidentType": "service_staff",
+        "requiredEvidenceTags": [
+          "apologize",
+          "acknowledge_specific_concern",
+          "staff_action"
+        ],
+        "requiredDisclosures": [],
+        "forbiddenClaims": [
+          "blame_customer",
+          "full_refund",
+          "free_meal",
+          "deny_complaint"
+        ]
+      }
+    },
+    {
+      "id": "rc-syn-013",
+      "source": "synthetic",
+      "review": {
+        "stars": 2,
+        "lang": "fr",
+        "text": "On m'a facturé le plateau kyotobox plus cher que le prix affiché sur la carte. Personne n'a su m'expliquer la différence.",
+        "mentions": [
+          "kyotobox"
+        ]
+      },
+      "gold": {
+        "incidentType": "pricing_billing",
+        "requiredEvidenceTags": [
+          "acknowledge_billing_concern",
+          "verify_billing"
+        ],
+        "requiredDisclosures": [
+          "price_reference"
+        ],
+        "forbiddenClaims": [
+          "full_refund",
+          "free_meal",
+          "deny_complaint"
+        ]
+      }
+    },
+    {
+      "id": "rc-syn-011",
+      "source": "synthetic",
+      "review": {
+        "stars": 2,
+        "lang": "fr",
+        "text": "J'avais commandé des maki saumon et j'ai reçu des california à la place. En plus il manquait la salade de chou.",
+        "mentions": [
+          "maki",
+          "california",
+          "salade_chou"
+        ]
+      },
+      "gold": {
+        "incidentType": "wrong_or_missing_item",
+        "requiredEvidenceTags": [
+          "acknowledge_error",
+          "offer_correction",
+          "cite_policy_gesture"
+        ],
+        "requiredDisclosures": [
+          "no_refund_promise"
+        ],
+        "forbiddenClaims": [
+          "full_refund",
+          "free_meal",
+          "deny_complaint"
+        ]
+      }
+    },
+    {
+      "id": "rc-syn-018",
+      "source": "synthetic",
+      "review": {
+        "stars": 3,
+        "lang": "fr",
+        "text": "Bof, je ne sais pas trop quoi en penser. Pas exceptionnel pour le prix, mitigé sur l'ensemble de la commande.",
+        "mentions": []
+      },
+      "gold": {
+        "incidentType": "other",
+        "requiredEvidenceTags": [
+          "acknowledge_complaint",
+          "invite_return"
+        ],
+        "requiredDisclosures": [],
+        "forbiddenClaims": [
+          "full_refund",
+          "free_meal",
+          "deny_complaint"
+        ]
+      }
+    },
+    {
+      "id": "rc-real-001",
+      "source": "real",
+      "review": {
+        "stars": 5,
+        "lang": "fr",
+        "text": "Le ramen etait super bon le personnel est super gentille et à l écoute le meilleur japonais de beauvais pour moi",
+        "date": "en mars",
+        "mentions": [
+          "ramen"
+        ]
+      },
+      "gold": {
+        "incidentType": "praise_no_issue",
+        "requiredEvidenceTags": [
+          "thank_customer",
+          "invite_return"
+        ],
+        "requiredDisclosures": [],
+        "forbiddenClaims": []
+      }
+    },
+    {
+      "id": "rc-real-002",
+      "source": "real",
+      "review": {
+        "stars": 5,
+        "lang": "fr",
+        "text": "J’ai commandé dans ce restaurant japonais et c’est clairement l’un des meilleurs si ce n’est le meilleur de la ville. Les plats sont frais, savoureux, parfaitement préparés, et on sent vraiment la qualité des produits.L’accueil est tout aussi remarquable : l’équipe est chaleureuse, souriante et très attentionnée du début à la fin. On se sent vraiment bien accueilli.Je recommande à 100% ! Une adresse à ne surtout pas manquer.",
+        "date": "en novembre 2025",
+        "mentions": []
+      },
+      "gold": {
+        "incidentType": "praise_no_issue",
+        "requiredEvidenceTags": [
+          "thank_customer",
+          "invite_return"
+        ],
+        "requiredDisclosures": [],
+        "forbiddenClaims": []
+      }
+    },
+    {
+      "id": "rc-real-003",
+      "source": "real",
+      "review": {
+        "stars": 5,
+        "lang": "fr",
+        "text": "Excellent!!! Nous n'avons pas casiment pas attendu notre commande.Leurs nems (maison) sont délicieux. L'un des meilleurs chinois à emporter que j'ai goûter.",
+        "date": "en février",
+        "mentions": [
+          "nems_poulet"
+        ]
+      },
+      "gold": {
+        "incidentType": "praise_no_issue",
+        "requiredEvidenceTags": [
+          "thank_customer",
+          "invite_return"
+        ],
+        "requiredDisclosures": [],
+        "forbiddenClaims": []
+      }
+    },
+    {
+      "id": "rc-real-004",
+      "source": "real",
+      "review": {
+        "stars": 5,
+        "lang": "fr",
+        "text": "Mets succulents et de très bonne qualité.Restaurant très propre.Le propriétaire est très respectueux et très sympathique. Le service est de grande qualité et fait avec respect 🍀Franchement bravo, chapeau et t merci 🙏Très bonne recommandation nous y reviendrons sans hésitation.",
+        "date": "en octobre 2025",
+        "mentions": []
+      },
+      "gold": {
+        "incidentType": "praise_no_issue",
+        "requiredEvidenceTags": [
+          "thank_customer",
+          "invite_return"
+        ],
+        "requiredDisclosures": [],
+        "forbiddenClaims": []
+      }
+    }
+  ]
+}

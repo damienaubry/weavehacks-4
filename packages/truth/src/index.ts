@@ -20,7 +20,7 @@ export interface MenuItem {
   name: string;
   /** price in euros */
   price: number;
-  category: "ramen" | "gyoza" | "soba" | "side" | "drink";
+  category: "ramen" | "gyoza" | "soba" | "side" | "drink" | "poke" | "yakisoba" | "sushi" | "box";
   /** is this item currently offerable? (canon availability) */
   available: boolean;
   /** short grounding hook agents may cite (e.g. the broth story) */
@@ -47,6 +47,20 @@ export const TRUTH: Truth = {
     { id: "gyoza", name: "Gyoza (6)", price: 6.5, category: "gyoza", available: true },
     { id: "cold_soba", name: "Cold Soba", price: 11.0, category: "soba", available: true, note: "warm-weather item; demand drops in rain/cold" },
     { id: "edamame", name: "Edamame", price: 4.0, category: "side", available: true },
+    // Real Le Kyoto dish NAMES (operator-confirmed); ⚠️ prices below are PLACEHOLDER — operator to set the real tariffs.
+    { id: "ramen", name: "Ramen", price: 13.5, category: "ramen", available: true },
+    { id: "kyotobox", name: "Kyoto Box", price: 16.9, category: "box", available: true, note: "signature assorted box" },
+    { id: "poke", name: "Poke Bowl", price: 13.9, category: "poke", available: true },
+    { id: "yakisoba", name: "Yakisoba", price: 12.5, category: "yakisoba", available: true },
+    { id: "nems_poulet", name: "Nems Poulet", price: 5.5, category: "side", available: true },
+    { id: "maki", name: "Maki", price: 6.0, category: "sushi", available: true },
+    { id: "california", name: "California Roll", price: 7.0, category: "sushi", available: true },
+    { id: "sushi", name: "Sushi", price: 8.5, category: "sushi", available: true },
+    { id: "soupe_miso", name: "Soupe Miso", price: 3.5, category: "side", available: true },
+    { id: "brochettes", name: "Brochettes", price: 6.5, category: "side", available: true },
+    { id: "tempura", name: "Tempura", price: 7.5, category: "side", available: true },
+    { id: "samoussas", name: "Samoussas", price: 5.0, category: "side", available: true },
+    { id: "salade_chou", name: "Salade de Chou", price: 3.5, category: "side", available: true },
   ],
   hours: {
     0: null, // Sun closed
@@ -68,3 +82,7 @@ export function menuItem(id: string): MenuItem | undefined {
 export function isGroundedPrice(id: string, price: number): boolean {
   return menuItem(id)?.price === price;
 }
+
+// POLICY canon (recovery/gesture rules, required disclosures, forbidden claims) + the mechanical
+// detection helpers WS-C's policyOk reads and WS-B's policy_lookup surfaces. ⚠️ WS-A owns this.
+export * from "./policy";

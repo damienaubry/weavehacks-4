@@ -1,138 +1,176 @@
-# Repo audit — `packages/*` + `apps/api/*`
+# Repo audit — package map + legacy-vs-hero split
 
-**Scope:** every source file under `packages/*` and `apps/api/*`. `apps/web/*` is the teammate's
-(Damien's) frontend — **not analyzed here**; noted only that it is fully decoupled (mock-driven,
-imports **zero** `@weavehacks/*` backend packages; it merely *mirrors* the backend types in
-comments).
+**Scope:** every source file under `packages/*` and `apps/*`. READ-ONLY map of what each file is and
+whether it's on the **hero** path (the Grounded Recovery Copilot / GRPR), the **legacy** path (kept
+runnable, not judged), or the **spine** (domain-agnostic, reused by both).
 
-**Method:** grep-based import-graph (`ts-prune`/`knip` are not installed — not worth pulling heavy
-deps for a hackathon). READ-ONLY: nothing was deleted, moved, or edited.
+**Direction reference (current):** the judged headline is the **GRPR — Grounded Recovery Pass Rate**
+(mechanical, conjunctive, over a dataset of review cases; `solo` < `team` < `team+memory`, same base
+model + tools, only the Verifier/memory differ). See `CLAUDE.md` → **RESOLVED 2026-06-07-bis**. This
+**supersedes** the earlier "grounding-rate-on-a-marketing-post" (2026-06-07) and "forecast-accuracy"
+headlines — both demoted; their machinery is kept and re-pointed (the GRPR's grounding sub-score reuses
+`checkGrounding`), not deleted.
 
-**Baseline:** `pnpm typecheck` → **17/17 tasks pass (green)**. No code was changed in this task.
-
-**Direction reference:** the locked headline is the **mechanical GROUNDING RATE** (solo vs team,
-same model + tools, only the Critic differs). Forecast accuracy is the agents' **task** + a modest
-**secondary** number, not the proof. See `CLAUDE.md` (RESOLVED 2026-06-07) and the memory note
-`forecast-accuracy-not-thesis-proof`.
+**Baseline:** `pnpm typecheck` is green across the integrated tree (the standing gate). `pnpm prep`
+and `pnpm grounding` (legacy) still run.
 
 ---
 
-## TL;DR
+## TL;DR — the three layers
 
-### ✅ Safe to delete — truly dead, zero references
-| File / target | Why | Status |
+- **Spine** (`orchestration`, `observability`, `runtime`, `shared`): domain-agnostic, fully live. No
+  restaurant/review nouns leak in. The recovery harness reuses it unchanged.
+- **Domain** (`agents`, `truth`, `seed`, `memory`): Brigade-specific. Both the legacy teams and the
+  **recovery hero pipeline** are live and wired end-to-end (four stations → mechanical Verifier →
+  GRPR scorer → failure-card memory).
+- **Apps** (`api`, `web`): `api` serves `/recovery` from the **real harness**; `web` renders the
+  `/recovery` GRPR view (leaderboard + drill-down + HITL) on CopilotKit alongside the legacy pages.
+
+> **The one remaining gap is dataset content**, not code: the recovery dataset is **12 clearly-marked
+> synthetic cases (0 real)** today; the operator loads the real Google reviews to hit the
+> "majority `source:"real"`" target. Menu/prices/hours and the policy limits are demo-plausible
+> placeholders pending operator validation (the SHAPE is locked).
+
+---
+
+## Layer 1 — Spine (domain-agnostic, reusable)
+
+### `packages/orchestration` — the proof engine
+
+| File | Role | What |
 | --- | --- | --- |
-| `packages/memory/**` (whole package: `src/index.ts` + `package.json`) | Not imported by **any** file and **not a dependency** of any package.json. It's the Layer-2/3 self-improvement stub (Redis scores / vector search / Forge log) that nothing calls. | **DELETED** — lockfile resynced, typecheck green. CLAUDE.md ARCHITECTURE updated to note the Layer-2/3 Redis substrate is to be rebuilt on `@weavehacks/shared` when Layer 2 is wired. |
+| `orchestrator.ts` | spine | `runSolo` (apply claims in order, last-write-wins — the failing baseline) + `runTeam` (gather → `detectConflicts` → resolve by authority → escalate `sensitive` to human). |
+| `conflict.ts` | spine | `detectConflicts` (≥2 distinct values for a key) + `resolveConflict` (highest authority wins; sensitive → escalate). Pure. |
+| `state.ts` | spine | `SharedState` — Redis-backed with automatic in-memory fallback. |
+| `types.ts` | spine | `Agent` / `AgentRole` / `Claim` / `Conflict` / `Resolution`. |
 
-> That's the *only* zero-reference file. Everything else below is either live, or referenced-but-off-direction (delete would break the harness or lose the secondary number).
+> The orchestrator resolves conflicts by authority but does **not** itself model a producer↔verifier
+> rewrite loop — that iteration is composed in the recovery pipeline. CLAUDE.md's "the Verifier-rewrite
+> loop is modeled here generically" overstates this slightly.
 
-### ⚠️ Revisit (do NOT blind-delete) — referenced but off-direction / stubbed
-| Target | Why revisit |
-| --- | --- |
-| `apps/api/src/scenario.ts` (synthetic `record_*` `TRUTH`) | STALE stand-in, but currently load-bearing for `compare`/`baseline`/`demo`. Replace *in place* with the grounding eval — don't delete until that lands. |
-| `packages/seed/src/orders.ts` (`ORDERS`, curated nightly slice) | Powers the **live `pnpm prep`** Historian tools, but is a *parallel* data source to the real `pos.json` (`pos.ts`). The grounding headline should check claims against the real data — migrate the analytics tools to `pos.ts`, then retire `ORDERS`. |
-| Dead **exports** (files stay): `reasonAgent` (`runtime/agents.ts`), `generate` / `reason` (`runtime/client.ts`) | No callers anywhere. Public runtime API surface; harmless, but trim when touching runtime. |
-| `packages/agents/src/prep.ts` (`contextForecast`, `backtest`, `naiveForecast`) | KEEP — but only for the **secondary** forecast line (`pnpm forecast`). Not the headline; don't let it grow. |
+### `packages/observability` — Weave wrapper + scoreboard
+
+| File | Role | What |
+| --- | --- | --- |
+| `weave.ts` | spine | `initWeave` / `traced` / `isWeaveActive`. **No-op without `WANDB_API_KEY`**. |
+| `compare.ts` | spine | `compareSoloVsTeam` — the **legacy** numeric scoreboard (`/compare`). The recovery harness calls `traced()` directly per case/score (`recovery.case` / `recovery.score`); GRPR ≠ the legacy `Scoreboard` shape. |
+
+### `packages/runtime` — inference
+
+| File | Role | What |
+| --- | --- | --- |
+| `providers.ts` | spine | `getProviders` / `defaultProvider` (**wandb** default, **openai** fallback) / `providerForRole`. Default models: W&B Inference `zai-org/GLM-5.1`, OpenAI `gpt-4o-mini`. |
+| `tools.ts` | spine | `runToolAgent` — the tool-calling loop the agents run on; tracks token usage + llmCalls. |
+| `client.ts` | spine | OpenAI-compatible chat client + `describeRuntime` + `generate`/`reason`. |
+| `agents.ts` | spine | OpenAI Agents SDK path (SDK tracing disabled — we trace with Weave). |
+| `json.ts` | spine | `parseJsonLoose`. |
+
+### `packages/shared`
+
+| File | Role | What |
+| --- | --- | --- |
+| `redis.ts` · `env.ts` · `types.ts` | spine | `createRedis`, `loadRootEnv`, domain-agnostic `Scoreboard` / `RunResult` / `Json`. **No review/recovery/menu types** — confirmed clean. |
 
 ---
 
-## Full classification
+## Layer 2 — Domain (Brigade)
 
-Legend: **USED (demo-critical)** = on the hero/demo path · **USED (support)** = utility/infra ·
-**DEAD** = zero refs · **STALE** = referenced but off-direction · **MOCK-OR-STUB** = placeholder ·
-**KEEP-FOR-SECONDARY** = only the modest forecast number.
+### `packages/agents` — the roster, tools, grounding, recovery pipeline
 
-### `apps/api/`
-| File | Class | Reason | Action |
-| --- | --- | --- | --- |
-| `index.ts` | USED (support) | HTTP server `/health` + `/compare`; → `health`, `compare`. | keep |
-| `health.ts` | USED (support) | `pnpm health` (Redis ping + Weave hello). | keep |
-| `seed.ts` | USED (support) | `pnpm seed` — loads/validates the seed slice. | keep |
-| `prep.ts` | USED (demo-critical) | `pnpm prep` — the live Brigade discussion (`runFridayPrep`). | keep |
-| `compare.ts` | USED (demo-critical) | `pnpm compare` scoreboard → `runners`, `compareSoloVsTeam`. | keep (re-point at grounding eval) |
-| `runners.ts` | USED (demo-critical) | wraps `runSolo`/`runTeam` over the scenario; used by compare/baseline/demo. | keep |
-| `scenario.ts` | **STALE** | synthetic `record_*` `TRUTH` stand-in; off-direction vs grounding. Load-bearing today. | replace in place with grounding eval |
-| `baseline.ts` | USED (support) | `pnpm baseline` — solo run. | keep |
-| `demo.ts` | USED (support) | `pnpm demo` — narrated stand-in. | keep |
-| `forecast.ts` | KEEP-FOR-SECONDARY | `pnpm forecast` — naive vs context backtest (sMAPE). Secondary number only. | keep, don't expand |
-| `ask.ts` | USED (support) | `pnpm ask` — one-off prompt (`runAgent`). | keep |
-| `agent-check.ts` | USED (support) | `agent:check` credit probe (`runAgent`). | keep |
-| `tool-check.ts` | USED (support) | `tool:check` — proves tool-calling. | keep |
-| `models.ts` | USED (support) | `models` — lists model ids. | keep |
+| File | Role | State |
+| --- | --- | --- |
+| `roles.ts` | manifest | **live** — 13 roles as data. Hero recovery tier: `curator` (55), `analyst` (58), `writer` (30, sensitive→HITL), `verifier` (90). `assertEveryRoleHasConflict()` rejects decorative agents. |
+| `recovery-stations.ts` | hero | **live (WS-B)** — `runCurator`/`runAnalyst`/`runWriter`/`runReviser`/`runSolo`/`runSoloRevise` on `runToolAgent` (op `agent.recovery.<id>`); `verifyRecovery` (MECHANICAL: `checkGrounding` ∧ `checkPolicy` ∧ ticket); `buildRecoveryCritic`; `ledgerToClaims`; coercers; `RECOVERY_TOOLS`; `INCIDENT_TYPES`. |
+| `recovery-pipeline.ts` | hero | **live (WS-B)** — `runRecoveryCase(case, variant, models)` drives `solo` / `team` / `team+memory` (same model+tools; `disableVerifier` kill-shot; `DEFAULT_SOLO_RETRIES=3` parity). One traced `recovery.case` op; returns `draftV1`/`verdictV1`/`verdictFinal`/`memoryUsed`/`budget`. |
+| `recovery-score.ts` | hero | **live (WS-C)** — `scoreCase` (conjunctive GRPR), `runRecoveryHarness` (3 variants over the dataset, budgeted, traced, with the `HonestComparison` guard), `buildRecoveryReport`, `judgeOverPromise` (opt-in narrow over-promise judge). |
+| `grounding.ts` | hero machine (reused) | **live** — `checkGrounding` (the mechanical claim checker the GRPR reuses) + `runGroundingScenario` + `CONTENT_PRODUCER`/`PREP_PRODUCER`. Drives legacy `pnpm grounding`. |
+| `recovery-contract.ts` | hero contract | **live** — types: `RecoveryVariant`, `RecoveryOutput`, `CaseScore`, `RecoveryRunResult`, `RecoveryReport`. |
+| `memory.ts` | re-export | **live** — re-exports `@weavehacks/memory` (`writeFailureCard`/`retrieveFailureCards`/`__resetMemory`/`FailureCard`/`RetrieveQuery`) so the agents barrel keeps one import surface. |
+| `tools/policy.ts` | hero tool | **live (WS-B)** — `policyLookupTool` / `POLICY_TOOLS` (`policy_lookup`, reads `truth` policy canon). |
+| `tools/reviews.ts` | shared tools | **live** — `review_stats` / `get_reviews` (Curator reuses these). |
+| `tools/realtime.ts` · `tools/history.ts` · `tools/analytics.ts` | legacy/shared tools | **live** — `get_menu`, the four Scout signals, POS analytics (read seed `ORDERS`). |
+| `stations.ts` · `discussion.ts` | legacy | **live** — the 4 legacy stations + `runFridayPrep` (`pnpm prep`). |
+| `prep.ts` | legacy (secondary) | **live** — `naiveForecast` / `contextForecast` / `backtest`. The demoted forecast number; don't expand. |
 
-### `packages/agents/` (DOMAIN)
-| File | Class | Reason | Action |
-| --- | --- | --- | --- |
-| `index.ts` | USED (support) | package barrel; re-exports roles/stations/discussion/tools/prep. | keep |
-| `discussion.ts` | USED (demo-critical) | `runFridayPrep` — the coordination loop behind `pnpm prep`. | keep |
-| `stations.ts` | USED (demo-critical) | the 4 LLM agents (Chef/Historian/Scout/Prep) on `runToolAgent`. | keep |
-| `roles.ts` | USED (demo-critical) | role/authority/conflict manifest + `assertEveryRoleHasConflict`. | keep |
-| `tools/index.ts` | USED (support) | tools barrel. | keep |
-| `tools/history.ts` | USED (demo-critical) | Historian's POS tools (baseline/by-condition/orders_on). | keep |
-| `tools/realtime.ts` | USED (demo-critical) | Scout's 4 signals + menu tools. | keep |
-| `tools/analytics.ts` | USED (support) | analytics behind history tools — **reads `ORDERS`** (see staleness note). | keep; re-point at `pos.ts` |
-| `prep.ts` | KEEP-FOR-SECONDARY | `naiveForecast`/`contextForecast`/`backtest` — forecast secondary only. | keep, don't expand |
+### `packages/truth` — CANON
 
-### `packages/seed/` (curated demo slice — DERIVED, not canon)
-| File | Class | Reason | Action |
-| --- | --- | --- | --- |
-| `index.ts` | USED (support) | barrel + `seedSummary`/`TARGET_DATE`. | keep |
-| `types.ts` | USED (support) | seed/`Order` types; consumed widely. | keep |
-| `pos.ts` | USED (demo-critical) | **real** POS contract + `loadServiceRecords`/`splitTrainHoldout` (the grounding/secondary data). | keep — make this the single data source |
-| `orders.ts` | **STALE** | `ORDERS` curated nightly slice; parallels `pos.json`. Powers live `pnpm prep` today. | migrate tools to `pos.ts`, then retire |
-| `weather.ts` | USED (support) | Scout signal (`WEATHER`). | keep |
-| `fixtures.ts` | USED (support) | Scout signal (`FIXTURES`/games). | keep |
-| `holidays.ts` | USED (support) | Scout signal (`HOLIDAYS`). | keep |
-| `events.ts` | USED (support) | Scout signal (`EVENTS`). | keep |
-| `reviews.ts` | USED (support) | `REVIEWS` (grounding source for review claims). | keep |
+| File | State |
+| --- | --- |
+| `index.ts` | **live** — `TRUTH` (menu/prices/hours) + `menuItem` / `isGroundedPrice`; re-exports `./policy`. |
+| `policy.ts` | **live (WS-A)** — the **policy canon**: `POLICY` (`gesture.maxCreditPct=15`, `maxGestureEuros=10`, `forbiddenGestures=[free_meal, full_refund, cash_refund, unlimited_free_delivery]`, disclosures, forbidden claims) + the mechanical detectors `replyHasDisclosure` / `replyHasForbiddenClaim` (shared verbatim by the Verifier and the scorer). Placeholder VALUES, operator-validated. |
 
-### `packages/orchestration/` (domain-agnostic core)
-| File | Class | Reason | Action |
-| --- | --- | --- | --- |
-| `index.ts` | USED (support) | barrel. | keep |
-| `orchestrator.ts` | USED (demo-critical) | `runSolo`/`runTeam`. | keep |
-| `conflict.ts` | USED (demo-critical) | `resolveConflict` (authority + sensitive→HITL). | keep |
-| `state.ts` | USED (support) | `SharedState` (Redis + in-memory fallback). | keep |
-| `types.ts` | USED (support) | `Agent`/`Claim`/core types. | keep |
+### `packages/seed` — curated demo slice (DERIVED, not canon)
 
-### `packages/observability/`
-| File | Class | Reason | Action |
-| --- | --- | --- | --- |
-| `index.ts` | USED (support) | barrel. | keep |
-| `weave.ts` | USED (support) | `initWeave`/`traced` (no-op without key). | keep |
-| `compare.ts` | USED (demo-critical) | `compareSoloVsTeam` — the scoreboard. | keep |
+| File | State |
+| --- | --- |
+| `recovery-types.ts` | **live** — `IncidentType` (9 values), `RecoveryCase`, `CaseContext`. |
+| `recovery-cases.ts` | **live** — `RECOVERY_CASES` loaded from `data/recovery-cases.json` (override `RECOVERY_CASES_PATH`); tolerant per-case shape check; `INCIDENT_TYPES`; `checkCaseShape`/`extractRawCases`. |
+| `data/recovery-cases.json` | **live (content placeholder)** — **12 synthetic cases, 0 real**, covering all 9 incident types (delivery_late ×2, food_quality ×2, praise_no_issue ×2, the rest ×1). Operator appends real cases. |
+| `validate-cases.ts` | **live (WS-A)** — `pnpm --filter @weavehacks/seed validate-cases`: strict gate that resolves every gold tag against `truth` POLICY + reports the distribution. |
+| `pos.ts` (+ `data/pos.json`) | **live** — real 3-year Hiboutik POS contract + `loadServiceRecords`/`splitTrainHoldout`. |
+| `orders.ts` | **live (stale-ish)** — `ORDERS`, a hand-authored nightly slice powering the live `pnpm prep`. Parallels `pos.json`; migrate analytics tools to `pos.ts`, then retire. |
+| `weather.ts` · `fixtures.ts` · `holidays.ts` · `events.ts` · `reviews.ts` | **live** — Scout signals + the review grounding source. |
 
-### `packages/runtime/`
-| File | Class | Reason | Action |
-| --- | --- | --- | --- |
-| `index.ts` | USED (support) | barrel. | keep |
-| `tools.ts` | USED (demo-critical) | `runToolAgent` — what the Brigade agents run on. | keep |
-| `providers.ts` | USED (support) | provider/model selection (`wandb`/`openai`). | keep |
-| `client.ts` | USED (support) | chat-completions client. **`generate`/`reason` exports have no callers.** | keep; trim dead exports |
-| `json.ts` | USED (support) | JSON parsing helpers. | keep |
-| `agents.ts` | USED (support) | `runAgent` (Agents-SDK path) used by `ask`/`agent-check`. **`reasonAgent` has no callers.** | keep; trim `reasonAgent` |
+### `packages/memory` — `@weavehacks/memory` (Layer-2 failure-card store)
 
-### `packages/shared/`, `packages/truth/`, `packages/memory/`
-| File | Class | Reason | Action |
-| --- | --- | --- | --- |
-| `shared/index.ts` · `redis.ts` · `env.ts` · `types.ts` | USED (support) | `createRedis`/`loadRootEnv`/`Scoreboard`/`RunResult`; consumed everywhere. | keep |
-| `truth/index.ts` | USED (demo-critical) | CANON menu/prices/hours; conflicts resolve toward it. | keep |
-| `memory/index.ts` (+ pkg) | **DEAD** | zero imports, not a dependency anywhere — Layer-2/3 stub. | **safe to delete** |
+| File | State |
+| --- | --- |
+| `failure-cards.ts` | **live (WS-D)** — `writeFailureCard` / `retrieveFailureCards` / `__resetMemory` / `resetMemoryAsync` / `describeMemory` + `FailureCard` / `RetrieveQuery`. |
+| `store.ts` | **live** — `FailureCardStore` / `getStore` / `replaceStore`. Redis vector search (RediSearch FT.SEARCH KNN) → portable cosine over plain Redis → in-memory mirror when Redis is down. |
+| `split.ts` | **live** — `chronologicalSplit` / `auditLeakage` / `assertNoLeakage` / `assessMemoryLift` (the no-leakage + honesty guards for the third leaderboard row). |
+| `embeddings.ts` | **live** — `embed` / `cosine` / `embedderInfo` / `__resetEmbeddings`. |
+
+> Depends only on the spine (`observability`/`runtime`/`shared`) — no restaurant nouns. `packages/agents`
+> depends on `@weavehacks/memory`; `packages/agents/src/memory.ts` re-exports it.
+
+---
+
+## Layer 3 — Apps
+
+### `apps/api` — orchestration runtime entrypoint
+
+HTTP routes (`index.ts`): `GET /` (info) · `/health` · `/compare` · `/recovery`.
+
+| File | Role | State |
+| --- | --- | --- |
+| `recovery.ts` | hero | **live (WS-C wired)** — `runRecovery()` runs `runRecoveryHarness` + `buildRecoveryReport` (real numbers). CLI: `pnpm recovery [--no-verifier] [--judge]`, `RECOVERY_MODEL=<id>`; prints rows + parity guard + honesty note + the solo-fail/team-pass sample case. |
+| `index.ts` · `health.ts` | spine/support | **live** — HTTP server + `pnpm health`. |
+| `compare.ts` · `runners.ts` · `scenario.ts` · `baseline.ts` · `demo.ts` | legacy | **live** — the stand-in solo-vs-team scoreboard + narrated demo. |
+| `grounding.ts` | legacy hero | **live** — `pnpm grounding` (the real mechanical grounding eval). |
+| `prep.ts` | legacy | **live** — `pnpm prep`. |
+| `forecast.ts` | legacy (secondary) | **live** — `pnpm --filter @weavehacks/api forecast`. Not aliased at root. |
+| `seed.ts` · `ask.ts` · `models.ts` · `agent-check.ts` · `tool-check.ts` | support | **live** — seed validation, one-off prompt, model listing, smoke tests. `models`/`agent:check`/`tool:check` are api-package scripts, not root aliases. |
+
+### `apps/web` — dashboard (CopilotKit deps live: `@copilotkit/react-core`/`react-ui`/`runtime` + `openai`)
+
+| Route / area | State |
+| --- | --- |
+| `app/recovery/page.tsx` + `CopilotLayer.tsx` | **live (WS-E)** — the GRPR view: leaderboard + agent theater + case drill-down (solo fail vs team pass + memory reuse) + HITL approve/reject, wrapped in CopilotKit. |
+| `app/api/copilotkit/route.ts` | **live** — the CopilotKit runtime endpoint (front-end only). |
+| `/` (`page.tsx`, OwnerHome) · `/brigade` | **live (legacy)** — week-ahead prep board + agent discussion/scoreboard. |
+
+---
+
+## Commands (where each lives)
+
+Root aliases (`package.json`): `dev` `build` `lint` `typecheck` `seed` `health` `recovery` `prep`
+`grounding` `compare` `baseline` `demo` `ask` `format`. Package-only scripts (run via
+`pnpm --filter @weavehacks/<pkg> <name>`): `forecast` `models` `agent:check` `tool:check` (api),
+`validate-cases` (seed). The recovery kill-shot is `pnpm recovery --no-verifier`.
 
 ---
 
 ## Notes & risks
-- **Two data sources is the main direction smell.** `ORDERS` (curated, `orders.ts`/`analytics.ts`,
-  live discussion) vs `pos.json` (real, `pos.ts`, forecast/grounding). The grounding headline must
-  check claims against the **real** data, so the Historian's analytics tools should read `pos.ts`.
-  Until then `ORDERS` is referenced and cannot be deleted without breaking `pnpm prep`.
-- **`scenario.ts` is a stand-in, not dead.** It's the synthetic `record_*` harness keeping
-  `compare`/`demo` green. Per CLAUDE.md it gets *replaced* by the grounding eval (`compareSoloVsTeam`
-  unchanged) — swap, don't delete.
-- **Dead exports (not files):** `reasonAgent`, `generate`, `reason` — no callers. Low-risk cleanup
-  when next editing runtime.
-- `apps/web` imports no backend package — deleting the dead backend items above cannot affect it.
 
----
-
-Want me to delete the safe-dead list? (separate task)
+- **Dataset content is the live gap.** 12 synthetic cases, 0 real today — the harness + UI run
+  end-to-end, but "grounded in real reviews" needs the operator's real cases (majority `source:"real"`).
+  `validate-cases` is the gate that keeps gold labels resolving to the shared POLICY vocabulary.
+- **Placeholder canon values.** `truth` menu/prices/hours and the `POLICY` gesture limits are
+  demo-plausible, operator-validated — the shape is locked, the values are swappable.
+- **GRPR numbers are live.** `pnpm recovery` runs real LLM agents (needs a runtime key, spends
+  credits) and produces the rows fresh — there are no baked-in numbers, and the parity guard +
+  honesty note keep the result honest.
+- **Two data sources.** `ORDERS` (curated, powers live `pnpm prep`) vs the real `pos.json`. Migrate
+  the analytics tools to `pos.ts`, then retire `ORDERS`.
+- **Spine purity.** `orchestration`/`observability`/`runtime`/`shared` (and `@weavehacks/memory`) stay
+  free of restaurant/review nouns — verified clean. Recovery types live in domain packages.

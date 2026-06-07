@@ -1,196 +1,204 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+/**
+ * / — the OWNER product: a sidebar + a "week ahead" planning board. The owner scans busy vs
+ * quiet services (rich cards), OPENS any one into its full detail view (forecast / why / prep
+ * plan), and signs off the few risky calls. No agents/traces here — that's /brigade + Weave.
+ *
+ * Per-item Approve/Keep decisions are LIFTED here (keyed `${date}|${slot}|${itemId}`) so the
+ * sidebar count, the summary tile, the banner, and the card flags all update live on a decision.
+ */
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { fetchWeek, itemKey, type ServiceForecast, type ServiceSlot, type WeekPlan } from "./lib/week";
+import type { Decision } from "./components/PrepRow";
+import { Sidebar } from "./components/Sidebar";
+import { TopBar } from "./components/TopBar";
+import { SummaryTiles } from "./components/SummaryTiles";
+import { ApprovalBanner } from "./components/ApprovalBanner";
+import { DayCard } from "./components/DayCard";
+import { ServiceDetail } from "./components/ServiceDetail";
+import { weekdayShort } from "./components/ui";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-const WEAVE_PROJECT = process.env.NEXT_PUBLIC_WEAVE_PROJECT ?? "weavehacks-4";
+type Selected = { date: string; slot: ServiceSlot } | null;
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-interface Resolution {
-  key: string;
-  status: "resolved" | "escalated";
-  value?: string;
-  winner?: string;
-  reason?: string;
-}
-interface RunDetail {
-  score: number;
-  correct: number;
-  total: number;
-  breakdown: Record<string, string>;
-  conflicts?: number;
-  resolutions?: Resolution[];
-}
-interface Scoreboard {
-  name: string;
-  solo: number;
-  team: number;
-  delta: number;
-  soloDetail?: RunDetail;
-  teamDetail?: RunDetail;
-}
-
-const pct = (n: number) => `${Math.round(n * 100)}%`;
-
-export default function Home() {
-  const [board, setBoard] = useState<Scoreboard | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default function OwnerHome() {
+  const [week, setWeek] = useState<WeekPlan | null>(null);
+  const [mocked, setMocked] = useState(false);
+  const [selected, setSelected] = useState<Selected>(null);
+  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
 
   const run = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`${API}/compare`, { cache: "no-store" });
-      if (!res.ok) throw new Error(`API ${res.status}`);
-      setBoard(await res.json());
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
+    const r = await fetchWeek();
+    setWeek(r.week);
+    setMocked(r.mocked);
   }, []);
-
   useEffect(() => {
     run();
   }, [run]);
 
-  return (
-    <main style={{ maxWidth: 920, margin: "0 auto", padding: "56px 24px 80px" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-        <div>
-          <p style={{ color: "var(--warn)", fontSize: 12, letterSpacing: 1, textTransform: "uppercase", margin: 0 }}>
-            Brigade · Le Kyoto · stand-in scenario
-          </p>
-          <h1 style={{ fontSize: 30, margin: "6px 0 2px", lineHeight: 1.1 }}>Single agent vs. agent team</h1>
-          <p style={{ color: "var(--muted)", fontSize: 15, marginTop: 0 }}>
-            Same scenario, run two ways. Every agent call and conflict resolution is traced in Weave.
-          </p>
-        </div>
-        <button onClick={run} disabled={loading} style={btnStyle(loading)}>
-          {loading ? "Running…" : "Re-run"}
-        </button>
-      </header>
-
-      {error && (
-        <p style={{ color: "#f87171", fontSize: 14, marginTop: 24 }}>
-          {error} — is the API up? Run <code>pnpm dev</code> (api on :3001).
-        </p>
-      )}
-
-      {board && (
-        <>
-          {/* Delta hero */}
-          <section style={{ ...panel, marginTop: 28, display: "flex", alignItems: "center", justifyContent: "center", gap: 28, padding: "28px 24px" }}>
-            <Score label="Single agent" value={pct(board.solo)} tone="bad" />
-            <div style={{ fontSize: 22, color: "var(--muted)" }}>→</div>
-            <Score label="Agent team" value={pct(board.team)} tone="good" />
-            <div style={{ width: 1, height: 56, background: "var(--border)" }} />
-            <div style={{ textAlign: "center" }}>
-              <div style={{ color: "var(--muted)", fontSize: 12, textTransform: "uppercase", letterSpacing: 1 }}>Delta</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: "var(--accent)" }}>
-                {board.delta >= 0 ? "+" : ""}
-                {Math.round(board.delta * 100)}
-              </div>
-              <div style={{ color: "var(--muted)", fontSize: 12 }}>points</div>
-            </div>
-          </section>
-
-          {/* Side-by-side breakdowns */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
-            <Column title="Solo agent" subtitle="no roles · last-write-wins" detail={board.soloDetail} />
-            <Column title="Agent team" subtitle="roles + verifier + conflict resolution" detail={board.teamDetail} />
-          </div>
-
-          {/* The star moment */}
-          {board.teamDetail?.resolutions?.length ? (
-            <section style={{ ...panel, marginTop: 16 }}>
-              <h2 style={{ fontSize: 16, margin: "0 0 12px" }}>What the team caught</h2>
-              {board.teamDetail.resolutions.map((r) => (
-                <div key={r.key} style={{ display: "flex", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border)", fontSize: 14 }}>
-                  <span>{r.status === "escalated" ? "⚠️" : "✅"}</span>
-                  <div>
-                    <strong>{r.key}</strong>{" "}
-                    {r.status === "escalated" ? (
-                      <span style={{ color: "var(--warn)" }}>escalated to a human</span>
-                    ) : (
-                      <span style={{ color: "var(--accent)" }}>resolved → '{r.value}'</span>
-                    )}
-                    <div style={{ color: "var(--muted)", fontSize: 13 }}>{r.reason}</div>
-                  </div>
-                </div>
-              ))}
-            </section>
-          ) : null}
-        </>
-      )}
-
-      <footer style={{ color: "var(--muted)", fontSize: 13, marginTop: 28 }}>
-        Traced in <strong>W&B Weave</strong> · project <code>{WEAVE_PROJECT}</code> —{" "}
-        <a href="https://wandb.ai" target="_blank" rel="noreferrer">
-          open dashboard
-        </a>
-        . CLI: <code>pnpm compare</code>, <code>pnpm demo</code>. Scenario is a deterministic
-        stand-in (generic <code>record_*</code> keys); it's replaced by the Content → Critic hero loop next.
-      </footer>
-    </main>
+  const openDays = useMemo(() => (week ? week.days.filter((d) => d.open) : []), [week]);
+  const flat = useMemo(
+    () => openDays.flatMap((d) => d.services.map((s) => ({ date: d.date, slot: s.slot, service: s }))),
+    [openDays],
   );
-}
+  const serviceAt = useCallback(
+    (sel: Selected): ServiceForecast | null =>
+      sel ? flat.find((f) => f.date === sel.date && f.slot === sel.slot)?.service ?? null : null,
+    [flat],
+  );
 
-const panel: React.CSSProperties = {
-  background: "var(--panel)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
-  padding: 20,
-};
+  const pendingFor = useCallback(
+    (svc: ServiceForecast, date: string, slot: ServiceSlot) =>
+      svc.plan.items.filter((i) => i.flagged && !decisions[itemKey(date, slot, i.id)]).length,
+    [decisions],
+  );
 
-function btnStyle(loading: boolean): React.CSSProperties {
-  return {
-    background: "var(--accent)",
-    color: "#06210f",
-    border: 0,
-    borderRadius: 8,
-    padding: "9px 16px",
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: loading ? "wait" : "pointer",
-    whiteSpace: "nowrap",
-  };
-}
+  const totals = useMemo(() => {
+    let covers = 0,
+      revenue = 0,
+      flagged = 0,
+      pending = 0;
+    for (const f of flat) {
+      covers += f.service.covers;
+      revenue += f.service.revenue;
+      flagged += f.service.flaggedCount;
+      pending += pendingFor(f.service, f.date, f.slot);
+    }
+    return { covers, revenue, flagged, pending };
+  }, [flat, pendingFor]);
 
-function Score({ label, value, tone }: { label: string; value: string; tone: "good" | "bad" }) {
+  const select = useCallback((date: string, slot: ServiceSlot) => {
+    setSelected({ date, slot });
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  const onDecide = useCallback(
+    (itemId: string, decision: Decision) => {
+      if (!selected) return;
+      setDecisions((p) => ({ ...p, [itemKey(selected.date, selected.slot, itemId)]: decision }));
+    },
+    [selected],
+  );
+  const onNav = useCallback(
+    (dir: -1 | 1) => {
+      if (!selected) return;
+      const idx = flat.findIndex((s) => s.date === selected.date && s.slot === selected.slot);
+      const next = flat[idx + dir];
+      if (next) setSelected({ date: next.date, slot: next.slot });
+    },
+    [flat, selected],
+  );
+
+  if (!week) {
+    return (
+      <div className="owner-shell">
+        <div className="owner-body">
+          <div className="owner-content" style={{ color: "var(--muted)" }}>
+            Loading the week…
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const peakSvc = serviceAt(week.peak);
+  const selService = serviceAt(selected);
+  const selIdx = selected ? flat.findIndex((s) => s.date === selected.date && s.slot === selected.slot) : -1;
+  const selIsPeak = !!selected && week.peak.date === selected.date && week.peak.slot === selected.slot;
+
   return (
-    <div style={{ textAlign: "center" }}>
-      <div style={{ color: "var(--muted)", fontSize: 12, textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
-      <div style={{ fontSize: 40, fontWeight: 800, color: tone === "good" ? "var(--accent)" : "#f87171" }}>{value}</div>
+    <div className="owner-shell">
+      <Sidebar week={week} selected={selected} approvals={totals.pending} onSelect={select} />
+
+      <div className="owner-body">
+        <TopBar rangeLabel={week.rangeLabel} />
+
+        <div className="owner-content">
+          {selService && selected ? (
+            <ServiceDetail
+              service={selService}
+              isPeak={selIsPeak}
+              decisionForItem={(itemId) => decisions[itemKey(selected.date, selected.slot, itemId)]}
+              onDecide={onDecide}
+              onBack={() => setSelected(null)}
+              onNav={onNav}
+              hasPrev={selIdx > 0}
+              hasNext={selIdx >= 0 && selIdx < flat.length - 1}
+            />
+          ) : (
+            <>
+              <span className="grounded-pill">
+                <DbDot /> Grounded in 3 years of Le Kyoto&apos;s service history
+              </span>
+
+              <h1 style={{ fontSize: 34, margin: "16px 0 8px", lineHeight: 1.05 }}>The week ahead</h1>
+              <p style={{ color: "var(--muted)", fontSize: 15, maxWidth: 720, margin: "0 0 22px" }}>
+                {week.rangeLabel}. Scan busy vs quiet services, open any one for its forecast, prep plan and the reasons
+                behind it, then sign off the few risky calls.
+              </p>
+
+              <SummaryTiles
+                s={{
+                  totalCovers: totals.covers,
+                  serviceCount: flat.length,
+                  revenue: totals.revenue,
+                  busiestLabel: `${weekdayShort(week.peak.date)} ${cap(week.peak.slot)}`,
+                  busiestCovers: peakSvc?.covers ?? 0,
+                  approvals: totals.pending,
+                }}
+              />
+
+              <div style={{ marginTop: 16 }}>
+                <ApprovalBanner
+                  pending={totals.pending}
+                  total={totals.flagged}
+                  onReview={() => {
+                    const f = flat.find((x) => pendingFor(x.service, x.date, x.slot) > 0);
+                    if (f) select(f.date, f.slot);
+                  }}
+                />
+              </div>
+
+              {mocked && (
+                <p style={{ color: "var(--warn)", fontSize: 12, marginTop: 14 }}>
+                  preview · sample data (live plan connects when the backend exposes <code>/prep/week</code>)
+                </p>
+              )}
+
+              <div className="daycards" style={{ marginTop: 22 }}>
+                {openDays.map((d) => (
+                  <div key={d.date} className="daycol">
+                    <div className="daycol-head">
+                      <span style={{ fontSize: 16, fontWeight: 800 }}>{weekdayShort(d.date)}</span>
+                      <span style={{ fontSize: 13, color: "var(--muted)" }}>{Number(d.date.split("-")[2])} Jun</span>
+                    </div>
+                    {d.services.map((s) => (
+                      <DayCard
+                        key={s.slot}
+                        service={s}
+                        isPeak={week.peak.date === d.date && week.peak.slot === s.slot}
+                        selected={false}
+                        pending={pendingFor(s, d.date, s.slot)}
+                        onSelect={() => select(d.date, s.slot)}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
-function Column({ title, subtitle, detail }: { title: string; subtitle: string; detail?: RunDetail }) {
+function DbDot() {
   return (
-    <section style={panel}>
-      <h2 style={{ fontSize: 16, margin: 0 }}>{title}</h2>
-      <p style={{ color: "var(--muted)", fontSize: 12, margin: "2px 0 14px" }}>{subtitle}</p>
-      {detail ? (
-        <>
-          <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>
-            {detail.correct}/{detail.total} records correct
-          </div>
-          {Object.entries(detail.breakdown).map(([k, v]) => {
-            const wrong = v.startsWith("WRONG");
-            const escalated = v.includes("escalated");
-            return (
-              <div key={k} style={{ display: "flex", gap: 8, padding: "4px 0", fontSize: 13 }}>
-                <span>{wrong ? "❌" : escalated ? "⚠️" : "✅"}</span>
-                <span style={{ minWidth: 78, fontFamily: "ui-monospace, monospace" }}>{k}</span>
-                <span style={{ color: wrong ? "#f87171" : "var(--muted)" }}>{v}</span>
-              </div>
-            );
-          })}
-        </>
-      ) : (
-        <p style={{ color: "var(--muted)", fontSize: 13 }}>no data</p>
-      )}
-    </section>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <ellipse cx="12" cy="5" rx="9" ry="3" />
+      <path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3" />
+    </svg>
   );
 }

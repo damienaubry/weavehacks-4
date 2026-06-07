@@ -1,11 +1,69 @@
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * BRIGADE — charte graphique
+ *
+ * Two-color identity over neutral canvas:
+ *   • EMBER   (brand, warm)  — the kitchen flame. Logo, halo, header hairline.
+ *   • MATCHA  (accent, fresh) — "go / approve / fresh". Functional positives.
+ *   • INDIGO  (depth)        — night service, the third halo hue.
+ *   • AMBER (warn) · RED (danger) — status.
+ *
+ * Dark is the default (premium, the halo pops); light is a warm off-white canvas.
+ * Theme switches by `data-theme="light"` on <html> (see ThemeToggle + the no-flash
+ * script in layout). Every surface reads from these tokens so both modes "just work".
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
 :root {
+  /* neutrals — DARK (default) */
   --bg: #0b0d10;
-  --panel: #14181d;
-  --border: #232a31;
+  --panel: #14171d;
+  --border: #232a33;
   --text: #e6edf3;
   --muted: #8b98a5;
-  --accent: #4ade80;
+  --chip: #0f1318;
+
+  /* brand + functional */
+  --brand: hsl(16 90% 58%); /* ember */
+  --brand-fg: #2a0f04;
+  --brand-3: hsl(246 74% 70%); /* indigo */
+  --accent: #4ade80; /* matcha */
+  --accent-fg: #06210f;
   --warn: #fbbf24;
+  --danger: #f87171;
+
+  /* halo intensity (per-theme) */
+  --aura-opacity: 0.22;
+  --dot: rgba(255, 255, 255, 0.05);
+  --header-bg: color-mix(in srgb, var(--bg) 78%, transparent);
+
+  --radius: 12px;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  /* neutrals — LIGHT (warm off-white) */
+  --bg: #faf8f5;
+  --panel: #ffffff;
+  --border: #e9e4db;
+  --text: #1a1d23;
+  --muted: #6b7280;
+  --chip: #f2efe9;
+
+  /* brand + functional — deepened for contrast on the light canvas */
+  --brand: hsl(16 84% 50%);
+  --brand-fg: #ffffff;
+  --brand-3: hsl(246 62% 58%);
+  --accent: hsl(142 64% 36%);
+  --accent-fg: #ffffff;
+  --warn: hsl(35 92% 42%);
+  --danger: #dc2626;
+
+  --aura-opacity: 0.14;
+  --dot: rgba(20, 22, 28, 0.05);
+  --header-bg: color-mix(in srgb, var(--bg) 80%, transparent);
+
+  color-scheme: light;
 }
 
 * {
@@ -20,6 +78,7 @@ body {
   color: var(--text);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 a {
@@ -28,8 +87,380 @@ a {
 
 code {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  background: #0f1318;
+  background: var(--chip);
   padding: 0.1em 0.4em;
   border-radius: 4px;
   font-size: 0.9em;
+}
+
+/* The app shell owns the opaque background + a stacking context, so the fixed
+   backdrop (z-index:-10) paints ABOVE this background but beneath all content. */
+.app-shell {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+/* ── Halo backdrop ─────────────────────────────────────────────────────────────
+   Three drifting brand auras (ember / matcha / indigo) over an adaptive dot-grid —
+   BRIGADE's signature ambiance. Decorative + non-interactive. */
+.brigade-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.brigade-dotgrid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(var(--dot) 1px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+
+.aura {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(150px);
+  opacity: var(--aura-opacity);
+}
+.aura-ember {
+  background: var(--brand);
+  top: -12rem;
+  right: -10rem;
+  width: 42rem;
+  height: 42rem;
+  animation: brigade-drift-a 24s ease-in-out infinite;
+}
+.aura-matcha {
+  background: var(--accent);
+  bottom: -12rem;
+  left: -10rem;
+  width: 36rem;
+  height: 36rem;
+  animation: brigade-drift-b 28s ease-in-out infinite;
+}
+.aura-indigo {
+  background: var(--brand-3);
+  bottom: -8rem;
+  right: 10%;
+  width: 26rem;
+  height: 26rem;
+  filter: blur(160px);
+  animation: brigade-drift-c 32s ease-in-out infinite;
+}
+
+@keyframes brigade-drift-a {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-44px, 32px); }
+}
+@keyframes brigade-drift-b {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(34px, -26px); }
+}
+@keyframes brigade-drift-c {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-22px, -30px); }
+}
+
+/* ── App header ────────────────────────────────────────────────────────────────*/
+.brigade-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 60px;
+  padding: 0 24px;
+  background: var(--header-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+/* centered credibility badge — "based on real data from Le Kyoto" */
+.header-badge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.header-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent);
+  animation: badge-pulse 2.2s ease-in-out infinite;
+}
+@keyframes badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 65%, transparent); }
+  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+@media (max-width: 880px) {
+  .header-badge { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .header-badge-dot { animation: none; }
+}
+
+/* luminous brand hairline along the header's bottom edge */
+.brigade-header::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--brand) 55%, transparent), transparent);
+  pointer-events: none;
+}
+
+/* ── Owner app shell: sidebar + main (top bar + content) ───────────────────────*/
+.owner-shell {
+  display: flex;
+  min-height: 100vh;
+}
+.sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  padding: 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: color-mix(in srgb, var(--panel) 35%, transparent);
+}
+.sidebar-eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin: 0 0 8px 6px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.nav-item.active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.nav-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+.jump-pill {
+  flex: 1;
+  text-align: center;
+  font-size: 12.5px;
+  padding: 7px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 50%, transparent);
+  color: var(--muted);
+  cursor: pointer;
+}
+.jump-pill.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.owner-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.owner-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 56px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--header-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.owner-content {
+  padding: 26px 28px 96px;
+}
+.grounded-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 13px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+/* rich day cards: one column per open day, lunch + dinner stacked */
+.daycards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 16px;
+}
+.daycol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.daycol-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+.svc-card {
+  position: relative;
+  text-align: left;
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.svc-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.svc-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+  overflow: hidden;
+  margin: 10px 0 12px;
+}
+.svc-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.ctx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+@media (max-width: 860px) {
+  .sidebar { display: none; }
+  .owner-content { padding: 20px 16px 80px; }
+}
+
+/* ── Owner page: full-width container + responsive week calendar ───────────────*/
+.owner-main {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px 32px 96px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+/* horizontal scroll keeps the 7-day calendar shape on narrow screens */
+.cal-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 760px;
+}
+.cal-day {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cal-dayhead {
+  text-align: center;
+  padding-bottom: 2px;
+}
+.cal-event {
+  position: relative;
+  flex: 1;
+  min-height: 120px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.cal-event:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+.cal-closed {
+  flex: 1;
+  min-height: 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  opacity: 0.45;
+}
+
+@media (max-width: 1100px) {
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 920px) {
+  .owner-main { padding: 22px 16px 80px; }
+}
+@media (max-width: 560px) {
+  .summary-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aura-ember, .aura-matcha, .aura-indigo { animation: none; }
+  html, body { transition: none; }
 }

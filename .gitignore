@@ -28,3 +28,7 @@ next-env.d.ts
 
 # cursor agents sdk local state (JSONL store / scratch cwd)
 .cursor-agents/
+
+# raw Google-reviews scrape (operator's local source, contains author names). The ANONYMIZED
+# derived dataset lives in packages/seed/data/recovery-cases.json (committed); raw scrape stays local.
+le-kyoto-google-reviews.json
