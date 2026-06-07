@@ -232,61 +232,90 @@ code {
   display: flex;
   min-height: 100vh;
 }
-.sidebar {
-  width: 250px;
-  flex-shrink: 0;
-  border-right: 1px solid var(--border);
-  padding: 18px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  background: color-mix(in srgb, var(--panel) 35%, transparent);
-}
-.sidebar-eyebrow {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--muted);
-  margin: 0 0 8px 6px;
-}
-.nav-item {
+/* ── Recovery stepper tabs (horizontal nav, replaces the old left sidebar) ──────*/
+.recovery-tabs {
+  position: sticky;
+  top: 56px; /* sits flush under the 56px-tall owner-topbar */
+  z-index: 19;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 11px;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--muted);
-  text-decoration: none;
-  cursor: pointer;
+  gap: 6px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--header-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.recovery-tabs::-webkit-scrollbar {
+  display: none;
+}
+.recovery-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 14px 6px 7px;
+  border-radius: 999px;
   border: 1px solid transparent;
-}
-.nav-item.active {
-  color: var(--text);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
-}
-.nav-count {
-  margin-left: auto;
-  font-size: 12px;
+  background: transparent;
   color: var(--muted);
-}
-.jump-pill {
-  flex: 1;
-  text-align: center;
-  font-size: 12.5px;
-  padding: 7px 6px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--panel) 50%, transparent);
-  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
-.jump-pill.active {
+.recovery-tab:hover {
   color: var(--text);
-  border-color: var(--accent);
+}
+.recovery-tab.active {
+  color: var(--text);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.recovery-tab-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+}
+.recovery-tab.active .recovery-tab-num {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+.recovery-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.tab-connector {
+  flex-shrink: 0;
+  width: 16px;
+  height: 1px;
+  background: var(--border);
+}
+/* offset anchored scroll so a section clears the sticky topbar + stepper */
+.recovery-section {
+  scroll-margin-top: 124px;
 }
 
 .owner-body {
@@ -380,8 +409,8 @@ code {
 }
 
 @media (max-width: 860px) {
-  .sidebar { display: none; }
   .owner-content { padding: 20px 16px 80px; }
+  .recovery-tabs { padding: 9px 16px; }
 }
 
 /* ── Owner page: full-width container + responsive week calendar ───────────────*/

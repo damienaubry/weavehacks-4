@@ -24,7 +24,8 @@ import { RecoveryLeaderboard } from "../components/RecoveryLeaderboard";
 import { AgentTheater } from "../components/AgentTheater";
 import { RecoveryCaseDrilldown } from "../components/RecoveryCaseDrilldown";
 import { RecoveryHITL, type HitlState, type HitlTarget, type HitlDecision } from "../components/RecoveryHITL";
-import { RecoverySidebar, type RecoverySection } from "../components/RecoverySidebar";
+import { RecoveryTabs, type RecoverySection } from "../components/RecoveryTabs";
+import { LogoMark } from "../components/Logo";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { CopilotLayer } from "./CopilotLayer";
 
@@ -59,9 +60,16 @@ export default function RecoveryPage() {
     approvals: useRef<HTMLDivElement>(null),
   } as const;
 
+  // pause the scroll-spy while a click-driven smooth scroll is in flight, so the active step
+  // doesn't flicker through the sections it passes over on the way to the target.
+  const spyPaused = useRef(false);
   const goto = useCallback((id: RecoverySection) => {
     setActive(id);
+    spyPaused.current = true;
     sections[id].current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => {
+      spyPaused.current = false;
+    }, 700);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -71,6 +79,28 @@ export default function RecoveryPage() {
       setMocked(r.mocked);
     });
   }, []);
+
+  // scroll-spy: highlight the step for the section currently in view (skipped during click nav).
+  useEffect(() => {
+    if (!report) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (spyPaused.current) return;
+        const top = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        const id = top?.target.getAttribute("data-section") as RecoverySection | null;
+        if (id) setActive(id);
+      },
+      { rootMargin: "-116px 0px -55% 0px" },
+    );
+    (Object.keys(sections) as RecoverySection[]).forEach((k) => {
+      const el = sections[k].current;
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report]);
 
   const ticket = useMemo(
     () => (report ? ticketFor(report.sampleCase.incidentTypeGold) : null),
@@ -105,12 +135,11 @@ export default function RecoveryPage() {
   return (
     <CopilotLayer report={report} stage={stage} hitl={hitl} decide={decide} replay={replay}>
       <div className="owner-shell">
-        <RecoverySidebar active={active} approvals={pendingApprovals} onNavigate={goto} />
-
         <div className="owner-body">
           {/* top bar */}
           <div className="owner-topbar">
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+              <LogoMark size={26} />
               <span style={{ fontSize: 15, fontWeight: 700 }}>Grounded Recovery Copilot</span>
               <span style={{ fontSize: 12, color: "var(--muted)" }}>
                 {report.dataset.n} cases · {report.dataset.realCount} real
@@ -135,6 +164,9 @@ export default function RecoveryPage() {
               <ThemeToggle />
             </div>
           </div>
+
+          {/* horizontal stepper — the four demo sections, sticky under the top bar */}
+          <RecoveryTabs active={active} approvals={pendingApprovals} onNavigate={goto} />
 
           <div className="owner-content" style={{ display: "flex", flexDirection: "column", gap: 22, maxWidth: 1040 }}>
             {/* hero */}
@@ -168,19 +200,19 @@ export default function RecoveryPage() {
               )}
             </div>
 
-            <div ref={sections.leaderboard}>
+            <div ref={sections.leaderboard} data-section="leaderboard" className="recovery-section">
               <RecoveryLeaderboard rows={report.rows} dataset={report.dataset} />
             </div>
 
-            <div ref={sections.theater}>
+            <div ref={sections.theater} data-section="theater" className="recovery-section">
               <AgentTheater sampleCase={report.sampleCase} runNonce={runNonce} onStage={setStage} />
             </div>
 
-            <div ref={sections.drilldown}>
+            <div ref={sections.drilldown} data-section="drilldown" className="recovery-section">
               <RecoveryCaseDrilldown c={report.sampleCase} />
             </div>
 
-            <div ref={sections.approvals}>
+            <div ref={sections.approvals} data-section="approvals" className="recovery-section">
               <RecoveryHITL reply={report.sampleCase.team.reply} ticket={ticket} state={hitl} onDecide={decide} />
             </div>
 
