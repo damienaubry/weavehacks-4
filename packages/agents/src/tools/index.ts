@@ -8,4 +8,5 @@ export {
   getEventsTool,
   getMenuTool,
 } from "./realtime";
+export { REVIEW_TOOLS, reviewStatsTool, getReviewsTool, reviewStats } from "./reviews";
 export { demandBaseline, demandByCondition, ordersOn } from "./analytics";

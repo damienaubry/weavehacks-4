@@ -40,6 +40,10 @@ export {
   demandBaseline,
   demandByCondition,
   ordersOn,
+  REVIEW_TOOLS,
+  reviewStatsTool,
+  getReviewsTool,
+  reviewStats,
 } from "./tools";
 
 // PREP station: deterministic forecasters + backtest. naiveForecast = the SOLO demand baseline;
@@ -62,9 +66,14 @@ export {
 export {
   checkGrounding,
   runGroundingScenario,
+  CONTENT_PRODUCER,
+  PREP_PRODUCER,
+  type ProducerConfig,
   type Claim,
   type ClaimCheck,
   type GroundingScore,
   type GroundingRun,
+  type PipelineResult,
+  type Budget,
   type GroundingComparison,
 } from "./grounding";

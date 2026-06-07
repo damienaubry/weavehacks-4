@@ -19,10 +19,11 @@
  */
 
 import { traced } from "@weavehacks/observability";
-import { runToolAgent, reason, type ToolCallRecord } from "@weavehacks/runtime";
+import { runToolAgent, reason, type ToolCallRecord, type ToolSpec, type TokenUsage } from "@weavehacks/runtime";
 import { TARGET_DATE } from "@weavehacks/seed";
 import { HISTORY_TOOLS } from "./tools/history";
 import { REALTIME_TOOLS, MENU_TOOLS } from "./tools/realtime";
+import { REVIEW_TOOLS } from "./tools/reviews";
 
 // ─── Claims + mechanical grounding check ─────────────────────────────────────────────────
 
@@ -142,6 +143,20 @@ interface GroundCtx {
 
 const isPercentClaim = (t: string): boolean => /%|percent|change/i.test(t);
 const isTotalClaim = (t: string): boolean => /total|cover/i.test(t);
+const isRatioClaim = (t: string): boolean => /\d+(\.\d+)?\s*x\b|\btimes\b|\bfold\b|multiplier/i.test(t);
+
+/** Is `stated` (a multiplier, e.g. 3 for "3x") the ratio between two of this item's own numbers? */
+function derivesRatio(stated: number, itemNums: number[]): boolean {
+  if (stated <= 0) return false;
+  for (const a of itemNums) {
+    if (a === 0) continue;
+    for (const b of itemNums) {
+      if (b === a) continue;
+      if (Math.abs(b / a - stated) <= Math.max(0.2, 0.15 * stated)) return true;
+    }
+  }
+  return false;
+}
 
 /** The tool numbers belonging to the menu item(s) named in a claim. */
 function itemNumbersForClaim(claimText: string, itemNumbers: Map<string, number[]>): number[] {
@@ -163,29 +178,44 @@ function derivesPercent(stated: number, itemNums: number[]): boolean {
   return false;
 }
 
+function verbatim(sv: number, c: Claim, ctx: GroundCtx): ClaimCheck | null {
+  const cited = c.citedTool && ctx.byTool.has(c.citedTool) ? ctx.byTool.get(c.citedTool)! : null;
+  if (cited) {
+    const m = cited.find((n) => numClose(sv, n));
+    if (m !== undefined) return { ...c, grounded: true, matchedTool: c.citedTool ?? undefined, matchedValue: m };
+  }
+  const any = ctx.globalNums.find((n) => numClose(sv, n));
+  if (any !== undefined) return { ...c, grounded: true, matchedTool: "(any tool)", matchedValue: any };
+  return null;
+}
+
 function checkOne(c: Claim, ctx: GroundCtx): ClaimCheck {
   const sv = c.statedValue;
   if (typeof sv === "number" && Number.isFinite(sv)) {
-    // 1) Verbatim — the value appears in a tool result (cited tool first, then any; generous).
-    const cited = c.citedTool && ctx.byTool.has(c.citedTool) ? ctx.byTool.get(c.citedTool)! : null;
-    if (cited) {
-      const m = cited.find((n) => numClose(sv, n));
-      if (m !== undefined) return { ...c, grounded: true, matchedTool: c.citedTool ?? undefined, matchedValue: m };
+    // RATIO ("3x"): item-scoped derivation ONLY — a bare small int must not coincidentally verbatim-match.
+    if (isRatioClaim(c.claim)) {
+      const itemNums = itemNumbersForClaim(c.claim, ctx.itemNumbers);
+      return itemNums.length >= 2 && derivesRatio(sv, itemNums)
+        ? { ...c, grounded: true, matchedTool: "(derived ratio)" }
+        : { ...c, grounded: false };
     }
-    const any = ctx.globalNums.find((n) => numClose(sv, n));
-    if (any !== undefined) return { ...c, grounded: true, matchedTool: "(any tool)", matchedValue: any };
-
-    // 2) Derived percent — correctly computable from the named item's own baseline→conditional numbers.
+    // PERCENT: verbatim (a direct stat like a review %) OR item-scoped %-change derivation.
     if (isPercentClaim(c.claim) && Math.abs(sv) <= 300) {
+      const v = verbatim(sv, c, ctx);
+      if (v) return v;
       const itemNums = itemNumbersForClaim(c.claim, ctx.itemNumbers);
       if (itemNums.length >= 2 && derivesPercent(sv, itemNums)) return { ...c, grounded: true, matchedTool: "(derived %)" };
+      return { ...c, grounded: false };
     }
-    // 3) Derived total — matches the sum of a per-item sheet a tool returned.
+    // TOTAL: verbatim OR matches a per-item sheet sum.
     if (isTotalClaim(c.claim)) {
+      const v = verbatim(sv, c, ctx);
+      if (v) return v;
       const m = ctx.perItemSums.find((s) => Math.abs(sv - s) <= Math.max(5, TOTAL_TOL_REL * s));
-      if (m !== undefined) return { ...c, grounded: true, matchedTool: "(derived total)", matchedValue: m };
+      return m !== undefined ? { ...c, grounded: true, matchedTool: "(derived total)", matchedValue: m } : { ...c, grounded: false };
     }
-    return { ...c, grounded: false };
+    // Plain quantity / temperature / price / count → verbatim.
+    return verbatim(sv, c, ctx) ?? { ...c, grounded: false };
   }
   // Factual/string claim → grounded if the normalized value appears in any tool-result string.
   const needle = String(sv).toLowerCase().trim();
@@ -223,30 +253,67 @@ export function checkGrounding(claims: Claim[], toolCalls: ToolCallRecord[]): Gr
   return { total, grounded, ungroundedCount: total - grounded, groundingRate: total ? grounded / total : 1, checks };
 }
 
-// ─── The producing agent (Prep) — same prompt + tools for solo and team ──────────────────
+// ─── Producers — Content (hero) + Prep. Same prompt + tools for solo and team; only the Critic differs ──
 
-const PRODUCER_TOOLS = [...HISTORY_TOOLS, ...REALTIME_TOOLS, ...MENU_TOOLS];
-
-// Phase-1 producer: write the brief, calling tools for numbers. NO JSON constraint here — forcing
-// JSON in the same turn makes some models emit tool calls as text and break function-calling. We
-// deliberately do NOT say "never invent a number" — grounding discipline is the Critic's job, and
-// baking it into the shared producer would erase the very gap we are measuring.
-const PROSE_INSTRUCTIONS =
-  `You are Prep at Le Kyoto, a Japanese takeout near Paris. Write tonight's dinner prep brief for ${TARGET_DATE} (a Friday; dow=5). ` +
-  `First gather data: call get_menu (the items), demand_baseline with dow=5 (the typical Friday), get_weather / get_games / get_holidays / get_events for the date, and demand_by_condition to see how those conditions moved demand historically. ` +
-  `Then write a SPECIFIC, confident brief a head chef can act on. For EACH menu item give the prep QUANTITY and the % CHANGE vs a normal Friday. Then give the single biggest swing, the expected TOTAL covers tonight, and tonight's weather (condition + temperature). Use exact numbers.`;
-
-// Phase-2 formatter: convert the producer's own prose into checkable claims. No tools, no judging —
-// pure text→JSON structuring, which models do reliably. The grounding DECISION stays mechanical.
-function extractInstruction(prose: string): string {
-  return (
-    `From this kitchen prep brief, extract ONLY the substantive demand/prep figures, as separate atomic claims: ` +
-    `(1) each menu item's prep QUANTITY, (2) each menu item's % CHANGE vs a normal Friday, (3) the expected TOTAL covers, ` +
-    `(4) tonight's weather condition (short string) and temperature (number). ` +
-    `Do NOT extract the year, calendar dates, clock/kickoff times, staff counts, or other structural numbers — only the demand figures above.\n\nBRIEF:\n${prose}\n\n` +
-    `Return ONLY JSON: {"claims":[{"claim":"<short statement>","statedValue":<number, or short string for a factual value>,"citedTool":<the tool the brief attributes it to, or null>}]}. One figure per claim.`
-  );
+export interface ProducerConfig {
+  id: string;
+  /** provider-routing role */
+  role: string;
+  /** system prompt: who the producer is + which tools to use. NO "never invent" — grounding is the Critic's job. */
+  instructions: string;
+  /** the producing task */
+  task: string;
+  tools: ToolSpec[];
+  /** phase-2 formatter: structure the producer's prose into checkable claims (no tools, no judging) */
+  extract: (prose: string) => string;
+  /** solo self-improvement prompt — a FAIR retry with NO mechanical grounding feedback (compute-parity baseline) */
+  selfRetry: (task: string, prevProse: string) => string;
 }
+
+// Prep brief producer (kept available).
+const PREP_INSTRUCTIONS =
+  `You are Prep at Le Kyoto, a Japanese takeout near Paris. Write tonight's dinner prep brief for ${TARGET_DATE} (a Friday; dow=5). ` +
+  `First gather data: call get_menu, demand_baseline with dow=5, get_weather / get_games / get_holidays / get_events, and demand_by_condition. ` +
+  `Then write a SPECIFIC, confident brief. For EACH menu item give the prep QUANTITY and the % CHANGE vs a normal Friday, plus the expected TOTAL covers and tonight's weather (condition + temperature). Use exact numbers.`;
+
+export const PREP_PRODUCER: ProducerConfig = {
+  id: "prep",
+  role: "prep",
+  instructions: PREP_INSTRUCTIONS,
+  task: `Write the dinner prep brief for ${TARGET_DATE}. Be specific and confident.`,
+  tools: [...HISTORY_TOOLS, ...REALTIME_TOOLS, ...MENU_TOOLS],
+  extract: (prose) =>
+    `From this kitchen prep brief, extract ONLY the substantive demand figures as atomic claims: each menu item's prep QUANTITY, ` +
+    `each item's % CHANGE vs a normal Friday, the expected TOTAL covers, and tonight's weather condition (string) + temperature (number). ` +
+    `Do NOT extract the year, dates, clock times, or other structural numbers.\n\nBRIEF:\n${prose}\n\n` +
+    `Return ONLY JSON: {"claims":[{"claim":"<short statement>","statedValue":<number or short string>,"citedTool":<tool or null>}]}. One figure per claim.`,
+  selfRetry: (task, prev) =>
+    `${task}\n\nYour current brief:\n"""${prev}"""\n\nRevise it to be more useful and precise; double-check each number against your tools and fix anything off.`,
+};
+
+// CONTENT — the hero producer: a social post that must ground its stats in POS + reviews.
+export const CONTENT_PRODUCER: ProducerConfig = {
+  id: "content",
+  role: "content",
+  instructions:
+    `You are the Content agent for Le Kyoto, a Japanese takeout near Paris. Write ONE short, punchy Instagram post ` +
+    `IN ENGLISH promoting Friday ${TARGET_DATE} dinner — make people want to pre-order. ` +
+    `You have tools to back claims with real numbers: demand_baseline / demand_by_condition / orders_on (POS history), ` +
+    `review_stats / get_reviews (customer reviews), get_menu (items + prices), get_weather / get_games (tonight's hooks). ` +
+    `Use specific stats (a popular dish, a review stat, a match-night angle). Output ONLY the post — 3–5 short lines, no notes or tables.`,
+  task: `Write the Instagram post (in English) for Friday ${TARGET_DATE} dinner.`,
+  tools: [...HISTORY_TOOLS, ...REVIEW_TOOLS, ...REALTIME_TOOLS, ...MENU_TOOLS],
+  extract: (prose) =>
+    `From this restaurant Instagram post, extract every QUANTITATIVE claim as atomic claims and give statedValue as a NUMBER: ` +
+    `a stat/percentage ("80% of 5-star mention broth" → 80), a multiplier ("gyoza sell 3x" → 3, keep "3x" in the claim text), ` +
+    `a price ("14,50€" → 14.5), a quantity, a rating, or a "+N% busier" change. ` +
+    `Do NOT extract clock times (e.g. 21h), single letters, dates, or non-quantitative fragments. Only quantitative claims.\n\nPOST:\n${prose}\n\n` +
+    `Return ONLY JSON: {"claims":[{"claim":"<short statement, keep '%'/'x'>","statedValue":<NUMBER>,"citedTool":<tool or null>}]}. One number per claim.`,
+  selfRetry: (task, prev) =>
+    `${task}\n\nHere is your current draft:\n"""${prev}"""\n\n` +
+    `Revise it: punchier, more compelling, with specific and credible numbers. You may use your tools. ` +
+    `Output ONLY the final Instagram post (3–5 short lines in English) — no notes, tables, or explanations.`,
+};
 
 export interface ProducerOutput {
   prose: string;
@@ -254,6 +321,29 @@ export interface ProducerOutput {
   toolCalls: ToolCallRecord[];
   raw: string;
   parseError?: string;
+  /** producer tool-agent token usage */
+  usage: TokenUsage;
+  /** chat-completions made by the producer tool-agent (incl. tool-loop steps) */
+  producerCalls: number;
+  /** chat-completions made by the phase-2 formatter */
+  formatterCalls: number;
+}
+
+/**
+ * Coerce a stated value into a number when it's a locale-formatted figure — "14,50€" → 14.5,
+ * "100%" → 100, "21h" → 21, "3x" → 3 — so the numeric checker (not the brittle string path) runs.
+ * Leaves genuine factual strings ("rain", "PSG–Marseille") as strings.
+ */
+function coerceValue(raw: unknown): number | string | null {
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+  if (typeof raw !== "string") return null;
+  const s = raw.trim();
+  if (s === "") return null;
+  let cleaned = s.replace(/[€$£%]/g, "").replace(/\bh\b/gi, "").replace(/\s/g, "");
+  if (cleaned.includes(",") && !cleaned.includes(".")) cleaned = cleaned.replace(",", "."); // decimal comma
+  const m = cleaned.match(/^-?\d+(\.\d+)?/); // leading number, e.g. "3x" → 3
+  if (m && Number.isFinite(Number(m[0]))) return Number(m[0]);
+  return s;
 }
 
 function normalizeClaims(raw: unknown): Claim[] {
@@ -262,11 +352,10 @@ function normalizeClaims(raw: unknown): Claim[] {
     .map((c) => {
       if (!c || typeof c !== "object") return null;
       const o = c as Record<string, unknown>;
-      let sv = o.statedValue as number | string;
-      if (typeof sv === "string" && sv.trim() !== "" && Number.isFinite(Number(sv))) sv = Number(sv);
+      const sv = coerceValue(o.statedValue);
       const claim = typeof o.claim === "string" ? o.claim : String(o.claim ?? "");
       const citedTool = typeof o.citedTool === "string" ? o.citedTool : null;
-      if (sv === undefined || sv === null || claim === "") return null;
+      if (sv === null || claim === "") return null;
       return { claim, statedValue: sv, citedTool } as Claim;
     })
     .filter((c): c is Claim => c !== null);
@@ -286,14 +375,15 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
   throw lastErr;
 }
 
-async function extractClaims(prose: string, model?: string): Promise<{ claims: Claim[]; parseError?: string }> {
+async function extractClaims(config: ProducerConfig, prose: string, model?: string): Promise<{ claims: Claim[]; parseError?: string; calls: number }> {
+  let calls = 0;
   const once = async (): Promise<Claim[]> => {
-    const obj = await withRetry(() => reason<{ claims?: unknown }>(extractInstruction(prose), { role: "prep", model, temperature: 0 }));
+    calls += 1;
+    const obj = await withRetry(() => reason<{ claims?: unknown }>(config.extract(prose), { role: config.role, model, temperature: 0 }));
     return normalizeClaims(obj.claims);
   };
   try {
     let claims = await once();
-    // Re-ask once if the formatter clearly under-extracted (a real brief states many figures).
     if (claims.length < 4) {
       try {
         const retry = await once();
@@ -302,51 +392,38 @@ async function extractClaims(prose: string, model?: string): Promise<{ claims: C
         /* keep first attempt */
       }
     }
-    return { claims };
+    return { claims, calls };
   } catch (e) {
-    return { claims: [], parseError: (e as Error).message };
+    return { claims: [], parseError: (e as Error).message, calls };
   }
 }
 
-/**
- * Producer = phase-1 tool-agent (writes the brief, grounds numbers via tools) + phase-2 formatter
- * (structures the prose into claims). Returns the prose, the structured claims, and the tool
- * results captured this run (what the claims are checked against).
- */
-async function runProducer(input: string, model?: string): Promise<ProducerOutput> {
+/** Producer = phase-1 tool-agent (writes the draft, grounds via tools) + phase-2 formatter (structures claims). */
+async function runProducer(config: ProducerConfig, input: string, model?: string): Promise<ProducerOutput> {
   const res = await withRetry(() =>
-    runToolAgent({
-      name: "Prep",
-      role: "prep",
-      instructions: PROSE_INSTRUCTIONS,
-      input,
-      tools: PRODUCER_TOOLS,
-      model,
-      maxSteps: 6,
-      temperature: 0.1,
-    }),
+    runToolAgent({ name: config.id, role: config.role, instructions: config.instructions, input, tools: config.tools, model, maxSteps: 6, temperature: 0.1 }),
   );
-  const { claims, parseError } = await extractClaims(res.text, model);
-  return { prose: res.text, claims, toolCalls: res.toolCalls, raw: res.text, parseError };
+  const { claims, parseError, calls } = await extractClaims(config, res.text, model);
+  return { prose: res.text, claims, toolCalls: res.toolCalls, raw: res.text, parseError, usage: res.usage, producerCalls: res.llmCalls, formatterCalls: calls };
 }
 
 // ─── The mechanical Critic feedback (drives ONE rewrite) ─────────────────────────────────
 
 function buildCriticFeedback(blocked: ClaimCheck[]): string {
   const lines = blocked.map(
-    (c) => `  • "${c.claim}" — stated ${JSON.stringify(c.statedValue)} (cited ${c.citedTool ?? "none"}): not found in any tool result.`,
+    (c) => `  • "${c.claim}" — stated ${JSON.stringify(c.statedValue)} (cited ${c.citedTool ?? "none"}): not backed by any tool result.`,
   );
   return (
-    `${blocked.length} figure(s) in your brief are NOT backed by any tool result captured this run:\n` +
+    `${blocked.length} claim(s) in your draft are NOT backed by any tool result captured this run:\n` +
     lines.join("\n") +
-    `\n\nRewrite the brief with HARD RULES:\n` +
-    `• Every number you state must be a number that appears in a tool result. Call demand_baseline / demand_by_condition / get_weather to get real numbers.\n` +
-    `• Do NOT state a % change or a total-covers figure unless that exact number is in a tool result. Instead state the tool-backed QUANTITY (e.g. "cold soba: prep 3, down from 9.5"), or OMIT the figure.\n` +
-    `• Do not restate any flagged number above. A grounded brief with fewer numbers beats a confident brief with invented ones.`
+    `\n\nRewrite with HARD RULES:\n` +
+    `• Every number/stat must appear in — or be directly computable from — a tool result. Call your tools (demand_baseline, demand_by_condition, review_stats, get_menu) for exact figures.\n` +
+    `• Do NOT state a multiplier ("3x"), percentage, or total unless the tool numbers support it — use the exact tool figure, or OMIT the claim.\n` +
+    `• Do not restate any flagged number. A grounded draft with fewer numbers beats a punchy one with invented stats.`
   );
 }
 
-// ─── Solo vs Team scenario ───────────────────────────────────────────────────────────────
+// ─── Solo vs Team scenario (with compute parity) ─────────────────────────────────────────
 
 export interface GroundingRun {
   groundingRate: number;
@@ -360,16 +437,31 @@ export interface GroundingRun {
   parseError?: string;
 }
 
-export interface GroundingComparison {
-  solo: GroundingRun;
-  team: GroundingRun;
-  /** the mechanical Critic feedback that drove the rewrite (empty if nothing was blocked) */
-  criticFeedback: string;
-  /** true if the rewrite ran (i.e. the solo had ungrounded claims to block) */
-  rewrote: boolean;
+/** Compute budget spent by a pipeline (for the parity guard). */
+export interface Budget {
+  /** number of producer drafts (v1 + retries/rewrite) */
+  passes: number;
+  /** total chat-completions (producer tool-loop steps + formatter calls) */
+  llmCalls: number;
+  /** total producer tokens (formatter tokens not captured; producer dominates) */
+  producerTokens: number;
 }
 
-const PRODUCER_TASK = `Write the dinner prep brief for ${TARGET_DATE}. Be specific and confident.`;
+export interface PipelineResult extends GroundingRun {
+  budget: Budget;
+}
+
+export interface GroundingComparison {
+  producer: string;
+  solo: PipelineResult;
+  team: PipelineResult;
+  /** the mechanical Critic feedback that drove the rewrite (empty if nothing was blocked) */
+  criticFeedback: string;
+  /** true if the rewrite ran (i.e. the first draft had ungrounded claims to block) */
+  rewrote: boolean;
+  /** the SHARED first-draft grounding (used by the across-run self-improvement series in BLOCK 2) */
+  firstDraft: { groundingRate: number; ungroundedCount: number; total: number };
+}
 
 function toRun(out: ProducerOutput, score: GroundingScore): GroundingRun {
   return {
@@ -385,35 +477,68 @@ function toRun(out: ProducerOutput, score: GroundingScore): GroundingRun {
   };
 }
 
+const budgetOf = (o: ProducerOutput): Budget => ({ passes: 1, llmCalls: o.producerCalls + o.formatterCalls, producerTokens: o.usage.totalTokens });
+function addBudget(b: Budget, o: ProducerOutput): void {
+  b.passes += 1;
+  b.llmCalls += o.producerCalls + o.formatterCalls;
+  b.producerTokens += o.usage.totalTokens;
+}
+
 /**
- * Run the grounding comparison. Producer v1 is SHARED (identical starting point); the solo is v1,
- * the team adds the mechanical Critic + one rewrite. Each producer call and each grounding check is
- * a traced Weave op.
+ * Run the grounding comparison with COMPUTE PARITY. v1 is the SHARED first draft. The SOLO pipeline
+ * then self-retries `soloRetries` times with NO Critic (a fair, equal-or-greater compute budget); the
+ * TEAM pipeline runs the mechanical Critic + ONE rewrite. Both score their final draft against every
+ * tool result their pipeline pulled. Each producer call and grounding check is a traced Weave op.
  */
-export async function runGroundingScenario(opts: { model?: string } = {}): Promise<GroundingComparison> {
-  const produce = traced("agent.prep.produce", (task: string) => runProducer(task, opts.model));
-  const rewrite = traced("agent.prep.rewrite", (task: string) => runProducer(task, opts.model));
+export async function runGroundingScenario(
+  config: ProducerConfig,
+  opts: { model?: string; soloRetries?: number } = {},
+): Promise<GroundingComparison> {
+  const soloRetries = opts.soloRetries ?? 2;
+  const produce = traced(`agent.${config.id}.produce`, (input: string) => runProducer(config, input, opts.model));
+  const soloRetry = traced(`agent.${config.id}.solo_retry`, (input: string) => runProducer(config, input, opts.model));
+  const rewrite = traced(`agent.${config.id}.rewrite`, (input: string) => runProducer(config, input, opts.model));
   const checkSolo = traced("grounding.check.solo", (claims: Claim[], calls: ToolCallRecord[]) => checkGrounding(claims, calls));
   const checkTeam = traced("grounding.check.team", (claims: Claim[], calls: ToolCallRecord[]) => checkGrounding(claims, calls));
 
-  // v1 — the shared producer draft.
-  const v1 = await produce(PRODUCER_TASK);
-  const soloScore = await checkSolo(v1.claims, v1.toolCalls);
-  const blocked = soloScore.checks.filter((c) => !c.grounded);
+  // v1 — the shared first draft.
+  const v1 = await produce(config.task);
+  const v1Score = checkGrounding(v1.claims, v1.toolCalls);
 
-  // SOLO = v1 as-is.
-  const solo = toRun(v1, soloScore);
-
-  // TEAM = v1 → Critic blocks ungrounded → one rewrite using only tool-backed numbers.
-  if (blocked.length === 0) {
-    return { solo, team: solo, criticFeedback: "", rewrote: false };
+  // SOLO pipeline — v1 + self-retries (NO Critic), equal/greater compute budget.
+  const soloBudget = budgetOf(v1);
+  const soloCalls = [...v1.toolCalls];
+  let soloOut = v1;
+  for (let i = 0; i < soloRetries; i++) {
+    const sr = await soloRetry(config.selfRetry(config.task, soloOut.prose));
+    addBudget(soloBudget, sr);
+    soloCalls.push(...sr.toolCalls);
+    soloOut = sr;
   }
-  const criticFeedback = buildCriticFeedback(blocked);
-  const v2Input = `${PRODUCER_TASK}\n\nYOUR PREVIOUS DRAFT:\n${v1.raw}\n\nMECHANICAL GROUNDING CRITIC:\n${criticFeedback}`;
-  const v2 = await rewrite(v2Input);
-  // The team had access to every tool result it pulled across v1 and the rewrite.
-  const teamCalls = [...v1.toolCalls, ...v2.toolCalls];
-  const teamScore = await checkTeam(v2.claims, teamCalls);
+  const soloScore = await checkSolo(soloOut.claims, soloCalls);
 
-  return { solo, team: toRun(v2, teamScore), criticFeedback, rewrote: true };
+  // TEAM pipeline — v1 → mechanical Critic → ONE rewrite.
+  const teamBudget = budgetOf(v1);
+  const blocked = v1Score.checks.filter((c) => !c.grounded);
+  let teamOut = v1;
+  let teamScore = v1Score;
+  let criticFeedback = "";
+  let rewrote = false;
+  if (blocked.length) {
+    criticFeedback = buildCriticFeedback(blocked);
+    const v2 = await rewrite(`${config.task}\n\nYOUR PREVIOUS DRAFT:\n${v1.raw}\n\nMECHANICAL GROUNDING CRITIC:\n${criticFeedback}`);
+    addBudget(teamBudget, v2);
+    teamOut = v2;
+    teamScore = await checkTeam(v2.claims, [...v1.toolCalls, ...v2.toolCalls]);
+    rewrote = true;
+  }
+
+  return {
+    producer: config.id,
+    solo: { ...toRun(soloOut, soloScore), budget: soloBudget },
+    team: { ...toRun(teamOut, teamScore), budget: teamBudget },
+    criticFeedback,
+    rewrote,
+    firstDraft: { groundingRate: v1Score.groundingRate, ungroundedCount: v1Score.ungroundedCount, total: v1Score.total },
+  };
 }

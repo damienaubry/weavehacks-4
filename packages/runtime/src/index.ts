@@ -13,6 +13,7 @@ export {
   type ToolCallRecord,
   type ToolAgentOptions,
   type ToolAgentResult,
+  type TokenUsage,
 } from "./tools";
 export { parseJsonLoose } from "./json";
 export {

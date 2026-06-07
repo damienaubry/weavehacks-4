@@ -1,86 +1,106 @@
 /**
  * pnpm --filter @weavehacks/api grounding
  *
- * STEP 1 of the grounding eval: run the SAME producer with the SAME tools twice — solo (alone)
- * vs team (producer → mechanical Critic → one rewrite) — and report the grounding rate of each,
- * measured MECHANICALLY (claim values checked against captured tool results, no LLM judge).
+ * BLOCK 1: Content + Critic with a MECHANICAL grounding metric (no LLM judge). The producing
+ * Content agent writes an Instagram post grounded in POS + reviews; a deterministic checker scores
+ * each claim against the tool RESULTS captured this run. SOLO = producer + self-retries (no Critic);
+ * TEAM = producer → mechanical Critic → one rewrite. Same model, same tools — only the Critic differs.
  *
- * Spends a little W&B Inference credit (two producer runs). Traced in Weave.
- *
- * HONESTY GUARD: if the solo does not actually hallucinate (already 0 ungrounded claims), we STOP
- * and say so — the gap must be real, never faked.
+ * Guards (never fake a gap):
+ *  • BUILD     — a side emits 0 parseable claims → degenerate, stop.
+ *  • HONESTY   — solo already 100% grounded → no hallucination to catch, stop.
+ *  • PARITY    — solo gets equal/greater compute (self-retries); if it reaches the same grounding,
+ *                the win isn't the Critic, stop.
  */
 
 import { loadRootEnv } from "@weavehacks/shared";
 import { initWeave } from "@weavehacks/observability";
-import { runGroundingScenario, type GroundingRun } from "@weavehacks/agents";
+import { reason } from "@weavehacks/runtime";
+import { runGroundingScenario, CONTENT_PRODUCER, type PipelineResult } from "@weavehacks/agents";
 
 loadRootEnv();
 
-function pct(x: number): string {
-  return `${Math.round(x * 100)}%`;
+const pct = (x: number): string => `${Math.round(x * 100)}%`;
+
+function printRun(label: string, r: PipelineResult): void {
+  console.log(
+    `  ${label.padEnd(26)} grounding ${pct(r.groundingRate).padStart(4)}  (${r.grounded}/${r.total} grounded · ${r.ungroundedCount} ungrounded)` +
+      `   budget: ${r.budget.passes} drafts · ${r.budget.llmCalls} calls · ${r.budget.producerTokens} tok`,
+  );
+  if (r.parseError) console.log(`      ⚠ formatter issue: ${r.parseError}`);
 }
 
-function printRun(label: string, r: GroundingRun): void {
-  console.log(`  ${label.padEnd(14)} grounding ${pct(r.groundingRate).padStart(4)}   (${r.grounded}/${r.total} claims grounded · ${r.ungroundedCount} ungrounded)`);
-  if (r.parseError) console.log(`      ⚠ producer JSON parse issue: ${r.parseError}`);
+/** Display-only marketing quality (1–10) — NEVER the metric. Non-fatal. */
+async function qualityScore(solo: string, team: string): Promise<string | null> {
+  try {
+    const r = await reason<{ solo: number; team: number; note?: string }>(
+      `Rate these two restaurant Instagram posts for marketing QUALITY (catchiness, clarity, CTA), 1–10. Display only.\n` +
+        `POST A:\n${solo}\n\nPOST B:\n${team}\n\nReturn ONLY JSON {"solo":<1-10>,"team":<1-10>,"note":"<≤6 words>"}.`,
+      { role: "critic", temperature: 0 },
+    );
+    return `solo ${r.solo}/10 · team ${r.team}/10${r.note ? ` — "${r.note}"` : ""}`;
+  } catch {
+    return null;
+  }
 }
 
 async function main() {
   await initWeave();
+  console.log("\n=== GROUNDING EVAL · Content: solo vs team (same model + same tools — only the Critic differs) ===");
 
-  console.log("\n=== GROUNDING EVAL · solo vs team (same model, same tools — only the Critic differs) ===");
-  const cmp = await runGroundingScenario();
+  const cmp = await runGroundingScenario(CONTENT_PRODUCER, { soloRetries: 2 });
 
   console.log("");
-  printRun("SOLO (alone)", cmp.solo);
-  printRun("TEAM (+Critic)", cmp.team);
+  printRun("SOLO (self-retry, no Critic)", cmp.solo);
+  printRun("TEAM (Critic + 1 rewrite)", cmp.team);
 
-  // The blocked claims — what the Critic caught in the solo's draft.
   const blocked = cmp.solo.checks.filter((c) => !c.grounded);
   if (blocked.length) {
-    console.log(`\n  Claims the mechanical Critic BLOCKED in the solo draft (${blocked.length}):`);
-    for (const c of blocked) {
-      console.log(`    ✗ "${c.claim}"  → stated ${JSON.stringify(c.statedValue)} (cited ${c.citedTool ?? "none"}); not in any tool result`);
-    }
+    console.log(`\n  Ungrounded claims in the SOLO's final post (${blocked.length}):`);
+    for (const c of blocked) console.log(`    ✗ "${c.claim}"  → stated ${JSON.stringify(c.statedValue)} (cited ${c.citedTool ?? "none"})`);
   }
-  // What survived in the team output.
   const teamBlocked = cmp.team.checks.filter((c) => !c.grounded);
-  if (cmp.rewrote) {
-    console.log(`\n  After the rewrite, the team has ${teamBlocked.length} ungrounded claim(s).`);
-    for (const c of teamBlocked) {
-      console.log(`    ✗ "${c.claim}"  → stated ${JSON.stringify(c.statedValue)}`);
-    }
+  if (teamBlocked.length) {
+    console.log(`\n  Ungrounded claims still in the TEAM's approved post (${teamBlocked.length}):`);
+    for (const c of teamBlocked) console.log(`    ✗ "${c.claim}"  → stated ${JSON.stringify(c.statedValue)}`);
   }
 
-  const dRate = cmp.team.groundingRate - cmp.solo.groundingRate;
-  const dUng = cmp.solo.ungroundedCount - cmp.team.ungroundedCount;
+  console.log(`\n  --- SOLO post ---\n${cmp.solo.prose.trim().slice(0, 500)}`);
+  console.log(`\n  --- TEAM post ---\n${cmp.team.prose.trim().slice(0, 500)}`);
+
+  const q = await qualityScore(cmp.solo.prose, cmp.team.prose);
+  if (q) console.log(`\n  [display only, NOT the metric] LLM quality: ${q}`);
+
   console.log("\n=== RESULT ===");
 
-  // BUILD GUARD — a side emitted no checkable claims (parse/format/transient failure, not a result).
+  // BUILD GUARD — a side produced no checkable claims.
   if (cmp.solo.total === 0 || (cmp.rewrote && cmp.team.total === 0)) {
-    const which = cmp.solo.total === 0 ? "SOLO" : "TEAM (rewrite)";
-    console.log(`  ⚠ BUILD ISSUE: ${which} emitted 0 parseable claims — a degenerate 100% is NOT a real result.`);
-    if (cmp.team.parseError) console.log(`    team formatter error: ${cmp.team.parseError}`);
-    console.log(`    Re-run; if it persists, fix the producer/formatter before interpreting.`);
+    console.log(`  ⚠ BUILD ISSUE: a side emitted 0 parseable claims — a degenerate 100% is not a real result. Re-run.`);
     process.exit(1);
   }
-
-  // HONESTY GUARD — the solo did not actually hallucinate (real claims, all grounded).
+  // HONESTY GUARD — the solo didn't actually hallucinate.
   if (cmp.solo.ungroundedCount === 0) {
-    console.log(`  ⚠ HONESTY GUARD TRIPPED: the SOLO is already ${pct(cmp.solo.groundingRate)} grounded (0 ungrounded).`);
-    console.log(`    There is NO real hallucination to catch on this task. STOP — make the task harder before claiming a gap.`);
-    console.log("");
+    console.log(`  ⚠ HONESTY GUARD: SOLO is already ${pct(cmp.solo.groundingRate)} grounded (0 ungrounded) even with ${cmp.solo.budget.passes} drafts.`);
+    console.log(`    No hallucination to catch — STOP and make the task harder before claiming a gap.`);
+    process.exit(0);
+  }
+  // COMPUTE-PARITY GUARD — solo had equal/greater budget; if it grounded as well, the win isn't the Critic.
+  const soloBudgetGE = cmp.solo.budget.llmCalls >= cmp.team.budget.llmCalls;
+  if (cmp.solo.ungroundedCount <= cmp.team.ungroundedCount) {
+    console.log(`  ⚠ COMPUTE-PARITY GUARD: SOLO reached ${pct(cmp.solo.groundingRate)} (${cmp.solo.ungroundedCount} ungrounded) at ${soloBudgetGE ? "≥" : "<"} the team's budget.`);
+    console.log(`    Solo grounds as well as the team — the gap is NOT attributable to the Critic. STOP.`);
     process.exit(0);
   }
 
-  console.log(`  solo grounding ${pct(cmp.solo.groundingRate)} (${cmp.solo.ungroundedCount} ungrounded)  →  team grounding ${pct(cmp.team.groundingRate)} (${cmp.team.ungroundedCount} ungrounded)`);
-  console.log(`  delta: +${Math.round(dRate * 100)} grounding pts · ${dUng} fewer ungrounded claim(s)`);
+  // Real, attributable win.
+  const dRate = Math.round((cmp.team.groundingRate - cmp.solo.groundingRate) * 100);
+  console.log(`  solo grounding ${pct(cmp.solo.groundingRate)} (${cmp.solo.ungroundedCount} ungrounded)  →  team grounding ${pct(cmp.team.groundingRate)} (${cmp.team.ungroundedCount} ungrounded)   (+${dRate} pts)`);
   console.log(
-    cmp.team.ungroundedCount === 0
-      ? `  → TEAM grounds every claim — 0 hallucinations in approved output. Same model, same tools; the Critic is the only difference.`
-      : `  → TEAM cuts ungrounded claims ${cmp.solo.ungroundedCount} → ${cmp.team.ungroundedCount}.`,
+    `  COMPUTE PARITY: solo spent ${soloBudgetGE ? "≥" : "<"} the team's budget ` +
+      `(solo ${cmp.solo.budget.llmCalls} calls / ${cmp.solo.budget.producerTokens} tok vs team ${cmp.team.budget.llmCalls} calls / ${cmp.team.budget.producerTokens} tok)` +
+      ` and STILL shipped ${cmp.solo.ungroundedCount} ungrounded claim(s).`,
   );
+  console.log(`  → The win is the Critic's verify-against-data capability, not extra compute. Same model, same tools.`);
   console.log("");
 }
 

@@ -47,10 +47,20 @@ export interface ToolAgentOptions {
   onToolCall?: (rec: ToolCallRecord) => void;
 }
 
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 export interface ToolAgentResult {
   text: string;
   toolCalls: ToolCallRecord[];
   steps: number;
+  /** number of chat-completion calls made (for compute-budget accounting) */
+  llmCalls: number;
+  /** summed token usage across this agent's completions (best-effort — 0 if the API omits it) */
+  usage: TokenUsage;
 }
 
 export async function runToolAgent(opts: ToolAgentOptions): Promise<ToolAgentResult> {
@@ -72,6 +82,15 @@ export async function runToolAgent(opts: ToolAgentOptions): Promise<ToolAgentRes
   ];
 
   const toolCalls: ToolCallRecord[] = [];
+  const usage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+  let llmCalls = 0;
+  const addUsage = (u: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined) => {
+    llmCalls += 1;
+    usage.promptTokens += u?.prompt_tokens ?? 0;
+    usage.completionTokens += u?.completion_tokens ?? 0;
+    usage.totalTokens += u?.total_tokens ?? (u?.prompt_tokens ?? 0) + (u?.completion_tokens ?? 0);
+  };
+
   for (let step = 0; step < maxSteps; step++) {
     const res = await client.chat.completions.create({
       model,
@@ -80,12 +99,13 @@ export async function runToolAgent(opts: ToolAgentOptions): Promise<ToolAgentRes
       tools: toolDefs.length ? toolDefs : undefined,
       tool_choice: toolDefs.length ? "auto" : undefined,
     });
+    addUsage(res.usage);
     const msg = res.choices[0]?.message;
     if (!msg) break;
 
     const calls = msg.tool_calls ?? [];
     if (calls.length === 0) {
-      return { text: msg.content ?? "", toolCalls, steps: step + 1 };
+      return { text: msg.content ?? "", toolCalls, steps: step + 1, llmCalls, usage };
     }
 
     // Record the assistant turn (must precede its tool results), then execute each call.
@@ -122,5 +142,6 @@ export async function runToolAgent(opts: ToolAgentOptions): Promise<ToolAgentRes
     temperature: opts.temperature ?? 0.2,
     messages,
   });
-  return { text: final.choices[0]?.message?.content ?? "", toolCalls, steps: maxSteps };
+  addUsage(final.usage);
+  return { text: final.choices[0]?.message?.content ?? "", toolCalls, steps: maxSteps, llmCalls, usage };
 }
