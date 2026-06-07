@@ -20,9 +20,9 @@ same model + tools, only the Critic differs). Forecast accuracy is the agents' *
 ## TL;DR
 
 ### ✅ Safe to delete — truly dead, zero references
-| File / target | Why |
-| --- | --- |
-| `packages/memory/**` (whole package: `src/index.ts` + `package.json`) | Not imported by **any** file and **not a dependency** of any package.json. It's the Layer-2/3 self-improvement stub (Redis scores / vector search / Forge log) that nothing calls. |
+| File / target | Why | Status |
+| --- | --- | --- |
+| `packages/memory/**` (whole package: `src/index.ts` + `package.json`) | Not imported by **any** file and **not a dependency** of any package.json. It's the Layer-2/3 self-improvement stub (Redis scores / vector search / Forge log) that nothing calls. | **DELETED** — lockfile resynced, typecheck green. CLAUDE.md ARCHITECTURE updated to note the Layer-2/3 Redis substrate is to be rebuilt on `@weavehacks/shared` when Layer 2 is wired. |
 
 > That's the *only* zero-reference file. Everything else below is either live, or referenced-but-off-direction (delete would break the harness or lose the secondary number).
 

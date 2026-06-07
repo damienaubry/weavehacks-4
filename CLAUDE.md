@@ -285,8 +285,9 @@ build step — `tsx` runs the api, Next transpiles the web).
 - **`packages/seed`** — curated demo slice, split into editable files: `orders` (POS history),
   `weather`, `fixtures`, `holidays`, `events` (the four realtime signals), `reviews`. `TARGET_DATE`
   is the Friday the team preps for. Derived, NOT canon.
-- **`packages/memory`** — Redis: performance scores, Critic feedback, review vector search,
-  Forge gap log, agent blueprints (Layers 2 & 3 of self-improvement).
+- _(Layers 2 & 3 substrate — across-runs grounding/feedback, Forge log, review vector search —
+  is NOT built yet. It was scaffolded as `packages/memory` but removed as dead code; rebuild on
+  `@weavehacks/shared`'s Redis client when Layer 2 is actually wired.)_
 - **`packages/shared`** — `createRedis()`, `loadRootEnv()`, cross-cutting types (`Scoreboard`,
   `RunResult`).
 - **`apps/api`** — orchestration runtime entrypoint. HTTP `/health` + `/compare`, and the
