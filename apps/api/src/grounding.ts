@@ -16,7 +16,7 @@
 import { loadRootEnv } from "@weavehacks/shared";
 import { initWeave } from "@weavehacks/observability";
 import { reason } from "@weavehacks/runtime";
-import { runGroundingScenario, CONTENT_PRODUCER, type PipelineResult } from "@weavehacks/agents";
+import { runGroundingScenario, CONTENT_PRODUCER, PREP_PRODUCER, type PipelineResult } from "@weavehacks/agents";
 
 loadRootEnv();
 
@@ -44,15 +44,19 @@ async function qualityScore(solo: string, team: string): Promise<string | null> 
   }
 }
 
-// The PRODUCER is the agent under test (may be a weak/cheap model to surface real hallucination).
-// The formatter + grounding check stay on the reliable default model — that's measurement, not the agent.
-const PRODUCER_MODEL = process.argv[2] || "meta-llama/Llama-3.1-8B-Instruct";
+// Usage: pnpm grounding [content|prep] [producerModel]
+//   producer = the agent under test (default = the reliable default model, GLM-5.1).
+//   the formatter + grounding check always stay on the reliable default model (measurement, not the agent).
+const arg1 = process.argv[2];
+const PRODUCER_NAME = arg1 === "prep" || arg1 === "content" ? arg1 : "content";
+const PRODUCER_MODEL = (arg1 === "prep" || arg1 === "content" ? process.argv[3] : arg1) || undefined;
+const CONFIG = PRODUCER_NAME === "prep" ? PREP_PRODUCER : CONTENT_PRODUCER;
 
 async function main() {
   await initWeave();
-  console.log(`\n=== GROUNDING EVAL · Content: solo vs team — producer=${PRODUCER_MODEL} (same model + tools both sides; only the Critic differs) ===`);
+  console.log(`\n=== GROUNDING EVAL · ${PRODUCER_NAME}: solo vs team — producer=${PRODUCER_MODEL ?? "default (GLM-5.1)"} (same model + tools both sides; only the Critic differs) ===`);
 
-  const cmp = await runGroundingScenario(CONTENT_PRODUCER, { producerModel: PRODUCER_MODEL, soloRetries: 2 });
+  const cmp = await runGroundingScenario(CONFIG, { producerModel: PRODUCER_MODEL, soloRetries: 2 });
 
   console.log("");
   printRun("SOLO (self-retry, no Critic)", cmp.solo);
