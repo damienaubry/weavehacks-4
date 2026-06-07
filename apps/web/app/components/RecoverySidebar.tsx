@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { LogoMark } from "./Logo";
 
 export type RecoverySection = "leaderboard" | "theater" | "drilldown" | "approvals";
@@ -47,16 +46,6 @@ export function RecoverySidebar({
             {n.id === "approvals" && approvals > 0 && <span className="nav-count">{approvals}</span>}
           </div>
         ))}
-      </div>
-
-      <div>
-        <p className="sidebar-eyebrow">Compare</p>
-        <Link href="/brigade" className="nav-item" style={{ textDecoration: "none" }}>
-          <FlowIcon /> Legacy brigade
-        </Link>
-        <Link href="/" className="nav-item" style={{ textDecoration: "none" }}>
-          <CalIcon /> Owner · week ahead
-        </Link>
       </div>
 
       <div
@@ -107,14 +96,6 @@ function ShieldIcon() {
   return (
     <svg viewBox="0 0 24 24" {...ico}>
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
-    </svg>
-  );
-}
-function CalIcon() {
-  return (
-    <svg viewBox="0 0 24 24" {...ico}>
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M16 2v4M8 2v4M3 10h18" />
     </svg>
   );
 }
