@@ -91,41 +91,133 @@ function collectStrings(value: unknown, into: string[]): void {
   }
 }
 
-function checkOne(c: Claim, globalNums: number[], byTool: Map<string, number[]>, globalStrs: string[]): ClaimCheck {
+/** Normalize a key/claim token for matching: lowercase, strip non-alphanumerics. */
+const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const PCT_TOL = 4; // percentage points
+const TOTAL_TOL_REL = 0.1;
+
+/** Numbers keyed by the field they sit under (e.g. perItemAvg.cold_soba → "coldsoba" → [9.5, 4]). */
+function collectKeyedNumbers(value: unknown, into: Map<string, number[]>, key = ""): void {
+  if (typeof value === "number") {
+    if (Number.isFinite(value) && !SKIP_KEYS.has(key)) {
+      const k = norm(key);
+      if (k) into.set(k, [...(into.get(k) ?? []), value]);
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const v of value) collectKeyedNumbers(v, into, key);
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const [k, v] of Object.entries(value)) collectKeyedNumbers(v, into, k);
+  }
+}
+
+/** Candidate service totals = the sum of each per-item map a tool returned (e.g. a baseline sheet). */
+function collectPerItemSums(value: unknown, into: number[]): void {
+  if (Array.isArray(value)) {
+    for (const v of value) collectPerItemSums(v, into);
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const [k, v] of Object.entries(value)) {
+      if (k === "perItemAvg" && v && typeof v === "object" && !Array.isArray(v)) {
+        const sum = Object.values(v as Record<string, unknown>).reduce<number>((s, x) => s + (typeof x === "number" ? x : 0), 0);
+        if (sum > 0) into.push(Math.round(sum * 10) / 10);
+      }
+      collectPerItemSums(v, into);
+    }
+  }
+}
+
+interface GroundCtx {
+  globalNums: number[];
+  byTool: Map<string, number[]>;
+  globalStrs: string[];
+  itemNumbers: Map<string, number[]>;
+  perItemSums: number[];
+}
+
+const isPercentClaim = (t: string): boolean => /%|percent|change/i.test(t);
+const isTotalClaim = (t: string): boolean => /total|cover/i.test(t);
+
+/** The tool numbers belonging to the menu item(s) named in a claim. */
+function itemNumbersForClaim(claimText: string, itemNumbers: Map<string, number[]>): number[] {
+  const t = norm(claimText);
+  const out: number[] = [];
+  for (const [k, nums] of itemNumbers) if (k.length >= 3 && t.includes(k)) out.push(...nums);
+  return out;
+}
+
+/** Is `stated` (a percent) the change between two of this item's own observed numbers? */
+function derivesPercent(stated: number, itemNums: number[]): boolean {
+  for (const a of itemNums) {
+    if (a === 0) continue;
+    for (const b of itemNums) {
+      if (b === a) continue;
+      if (Math.abs((100 * (b - a)) / a - stated) <= PCT_TOL) return true;
+    }
+  }
+  return false;
+}
+
+function checkOne(c: Claim, ctx: GroundCtx): ClaimCheck {
   const sv = c.statedValue;
   if (typeof sv === "number" && Number.isFinite(sv)) {
-    // Prefer the cited tool's own numbers; fall back to ANY captured number (generous).
-    const cited = c.citedTool && byTool.has(c.citedTool) ? byTool.get(c.citedTool)! : null;
+    // 1) Verbatim — the value appears in a tool result (cited tool first, then any; generous).
+    const cited = c.citedTool && ctx.byTool.has(c.citedTool) ? ctx.byTool.get(c.citedTool)! : null;
     if (cited) {
       const m = cited.find((n) => numClose(sv, n));
       if (m !== undefined) return { ...c, grounded: true, matchedTool: c.citedTool ?? undefined, matchedValue: m };
     }
-    const any = globalNums.find((n) => numClose(sv, n));
+    const any = ctx.globalNums.find((n) => numClose(sv, n));
     if (any !== undefined) return { ...c, grounded: true, matchedTool: "(any tool)", matchedValue: any };
+
+    // 2) Derived percent — correctly computable from the named item's own baseline→conditional numbers.
+    if (isPercentClaim(c.claim) && Math.abs(sv) <= 300) {
+      const itemNums = itemNumbersForClaim(c.claim, ctx.itemNumbers);
+      if (itemNums.length >= 2 && derivesPercent(sv, itemNums)) return { ...c, grounded: true, matchedTool: "(derived %)" };
+    }
+    // 3) Derived total — matches the sum of a per-item sheet a tool returned.
+    if (isTotalClaim(c.claim)) {
+      const m = ctx.perItemSums.find((s) => Math.abs(sv - s) <= Math.max(5, TOTAL_TOL_REL * s));
+      if (m !== undefined) return { ...c, grounded: true, matchedTool: "(derived total)", matchedValue: m };
+    }
     return { ...c, grounded: false };
   }
   // Factual/string claim → grounded if the normalized value appears in any tool-result string.
   const needle = String(sv).toLowerCase().trim();
-  const hit = needle.length >= 2 && globalStrs.some((s) => s.includes(needle));
+  const hit = needle.length >= 2 && ctx.globalStrs.some((s) => s.includes(needle));
   return { ...c, grounded: hit, matchedTool: hit ? "(string match)" : undefined };
 }
 
 /**
- * MECHANICAL grounding check (no LLM). A claim is grounded iff its stated value appears in a tool
- * result captured during this run (numbers within ±1 or ±8%; strings as substrings).
+ * MECHANICAL grounding check (no LLM). A claim is grounded iff its stated value is backed by the
+ * tool results captured this run — either VERBATIM (the number appears, within ±1/±8%) or DERIVED
+ * (a % change computable from the named item's own numbers; a total matching a per-item sum). A
+ * derived figure only grounds if the data to compute it was actually pulled — so invented figures
+ * stay flagged. Strings ground as substrings.
  */
 export function checkGrounding(claims: Claim[], toolCalls: ToolCallRecord[]): GroundingScore {
-  const globalNums: number[] = [];
-  const globalStrs: string[] = [];
-  const byTool = new Map<string, number[]>();
+  const ctx: GroundCtx = {
+    globalNums: [],
+    byTool: new Map(),
+    globalStrs: [],
+    itemNumbers: new Map(),
+    perItemSums: [],
+  };
   for (const tc of toolCalls) {
     const nums: number[] = [];
     collectNumbers(tc.result, nums);
-    globalNums.push(...nums);
-    byTool.set(tc.name, [...(byTool.get(tc.name) ?? []), ...nums]);
-    collectStrings(tc.result, globalStrs);
+    ctx.globalNums.push(...nums);
+    ctx.byTool.set(tc.name, [...(ctx.byTool.get(tc.name) ?? []), ...nums]);
+    collectStrings(tc.result, ctx.globalStrs);
+    collectKeyedNumbers(tc.result, ctx.itemNumbers);
+    collectPerItemSums(tc.result, ctx.perItemSums);
   }
-  const checks = claims.map((c) => checkOne(c, globalNums, byTool, globalStrs));
+  const checks = claims.map((c) => checkOne(c, ctx));
   const grounded = checks.filter((c) => c.grounded).length;
   const total = checks.length;
   return { total, grounded, ungroundedCount: total - grounded, groundingRate: total ? grounded / total : 1, checks };
