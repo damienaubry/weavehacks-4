@@ -30,7 +30,13 @@ export interface CopilotLayerProps {
 
 export function CopilotLayer(props: CopilotLayerProps) {
   return (
-    <CopilotKit runtimeUrl="/api/copilotkit">
+    // showDevConsole={false} disables CopilotKit's CopilotDevConsole. CopilotKit ALSO injects a
+    // separate <cpk-web-inspector> web component that shows a "🪁 Big update: …" marketing banner in
+    // dev — not gated by that prop. Both live at the document root (the inspector in a shadow DOM, so
+    // we hide its light-DOM HOST element), hence GLOBAL selectors. Keeps the demo clean on a projector;
+    // the chat sidebar (copilotKitButton / CopilotSidebar) is a different element and stays.
+    <CopilotKit runtimeUrl="/api/copilotkit" showDevConsole={false}>
+      <style>{`.copilotKitDevConsole,cpk-web-inspector{display:none !important;}`}</style>
       <CopilotBridge {...props} />
       {props.children}
       <CopilotSidebar

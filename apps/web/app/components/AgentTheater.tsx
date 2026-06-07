@@ -10,7 +10,14 @@
  * never depends on the proof engine or an LLM being reachable.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { STATIONS, type RecoverySampleCase, type StationId } from "../lib/recovery";
+import {
+  STATIONS,
+  INCIDENT_LABEL,
+  classifyFailReason,
+  extractGesture,
+  type RecoverySampleCase,
+  type StationId,
+} from "../lib/recovery";
 
 type Status = "idle" | "working" | "done" | "blocked";
 type Tone = "neutral" | "blocked" | "pass";
@@ -36,7 +43,48 @@ const S = (curator: Status, analyst: Status, writer: Status, verifier: Status): 
   verifier,
 });
 
+/** The Verifier's concrete challenges to v1, derived from the case's REAL solo failure reasons. */
+function v1Challenges(c: RecoverySampleCase): string[] {
+  const soloGesture = extractGesture(c.solo.reply);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of c.solo.failReasons) {
+    let line: string;
+    switch (classifyFailReason(r)) {
+      case "over_promise":
+        line = `policy: over-promise — ${soloGesture ?? "the gesture"} exceeds the credit limit`;
+        break;
+      case "policy":
+        line = "policy / required-disclosure violation";
+        break;
+      case "ungrounded":
+        line = "unsupported claim — not in the ledger";
+        break;
+      case "triage":
+        line = "wrong incident type";
+        break;
+      case "ticket":
+        line = "internal ticket missing";
+        break;
+      default:
+        line = r;
+    }
+    if (!seen.has(line)) {
+      seen.add(line);
+      out.push(line);
+    }
+  }
+  return out.length ? out : ["policy: over-promise — exceeds the credit limit"];
+}
+
 function buildFrames(c: RecoverySampleCase): Frame[] {
+  const triage = INCIDENT_LABEL[c.incidentTypeGold] ?? c.incidentTypeGold;
+  const teamGesture = extractGesture(c.team.reply) ?? "a policy-safe gesture";
+  const soloGesture = extractGesture(c.solo.reply);
+  const challenges = v1Challenges(c);
+  const hasOverPromise = challenges.some((l) => l.includes("over-promise"));
+  const blockLine = `✗ ${challenges.join("   ✗ ")} → BLOCK.`;
+
   const l: LogLine[] = [];
   const push = (who: string, text: string, tone: Tone = "neutral") => {
     l.push({ who, text, tone });
@@ -63,7 +111,7 @@ function buildFrames(c: RecoverySampleCase): Frame[] {
     },
     {
       statuses: S("done", "working", "idle", "idle"),
-      log: push("Analyst", "Triage → delivery_late. Ledger: 50-min delay, cold ramen, policy gesture = 15% credit."),
+      log: push("Analyst", `Triage → ${triage}. Ledger: issue acknowledged + policy gesture = ${teamGesture}.`),
       showV1: false,
       v1Blocked: false,
       showV2: false,
@@ -72,12 +120,12 @@ function buildFrames(c: RecoverySampleCase): Frame[] {
     },
     {
       statuses: S("done", "done", "working", "idle"),
-      log: push("Writer", "Draft v1 — wants a fluent, generous reply."),
+      log: push("Writer", `Draft v1 — wants a fluent, generous reply${soloGesture ? ` (offers a ${soloGesture})` : ""}.`),
       showV1: true,
       v1Blocked: false,
       showV2: false,
       v2Passed: false,
-      caption: "Writer drafts v1 — it over-promises.",
+      caption: `Writer drafts v1 — it ${hasOverPromise ? "over-promises" : "breaks a rule"}.`,
     },
     {
       statuses: S("done", "done", "done", "working"),
@@ -90,7 +138,7 @@ function buildFrames(c: RecoverySampleCase): Frame[] {
     },
     {
       statuses: S("done", "done", "working", "blocked"),
-      log: push("Verifier", "✗ policy: over-promise “repas offert + remboursement intégral”   ✗ ticket: missing → BLOCK.", "blocked"),
+      log: push("Verifier", blockLine, "blocked"),
       showV1: true,
       v1Blocked: true,
       showV2: false,
@@ -99,7 +147,7 @@ function buildFrames(c: RecoverySampleCase): Frame[] {
     },
     {
       statuses: S("done", "done", "working", "idle"),
-      log: push("Writer", "Rewrite v2 — 15% credit per policy + an internal ticket."),
+      log: push("Writer", `Rewrite v2 — ${teamGesture} per policy + an internal ticket.`),
       showV1: true,
       v1Blocked: true,
       showV2: true,
@@ -324,8 +372,10 @@ function DraftCard({ version, text, state }: { version: 1 | 2; text: string; sta
           fontSize: 13,
           lineHeight: 1.5,
           color: state === "blocked" ? "var(--muted)" : "var(--text)",
-          textDecoration: state === "blocked" ? "line-through" : "none",
-          textDecorationColor: "color-mix(in srgb, var(--danger) 60%, transparent)",
+          // single shorthand (line + color) — never mix textDecoration + textDecorationColor, which
+          // React flags as a shorthand/longhand conflict when the value changes across rerenders.
+          textDecoration:
+            state === "blocked" ? "line-through color-mix(in srgb, var(--danger) 60%, transparent)" : "none",
         }}
       >
         {text}

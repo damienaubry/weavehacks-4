@@ -15,10 +15,56 @@ import {
 } from "@copilotkit/runtime";
 import OpenAI from "openai";
 import type { NextRequest } from "next/server";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
 const ENDPOINT = "/api/copilotkit";
 
+/**
+ * Next doesn't auto-load the monorepo-root `.env` (it only reads apps/web/.env*), so the runtime
+ * key the rest of the project configures there is invisible here — which makes CopilotKit's runtime
+ * probe 503 and spam the console. Pull the relevant keys from the root `.env` once, WITHOUT a new
+ * dependency or coupling to a server package, and only if they aren't already set. No `.env` / no
+ * key ⇒ we fall through to the graceful 503 below and the page still renders.
+ */
+let rootEnvLoaded = false;
+function ensureRootEnv(): void {
+  if (rootEnvLoaded) return;
+  rootEnvLoaded = true;
+  if (process.env.OPENAI_API_KEY || process.env.COPILOT_API_KEY) return;
+  const WANTED = ["OPENAI_API_KEY", "COPILOT_API_KEY", "OPENAI_BASE_URL", "COPILOT_MODEL"];
+  const here = (() => {
+    try {
+      return dirname(fileURLToPath(import.meta.url));
+    } catch {
+      return process.cwd();
+    }
+  })();
+  const candidates = [
+    join(here, "../../../../../.env"), // repo root from app/api/copilotkit/route.ts
+    join(process.cwd(), ".env"),
+    join(process.cwd(), "../../.env"),
+  ];
+  for (const p of candidates) {
+    try {
+      if (!existsSync(p)) continue;
+      for (const line of readFileSync(p, "utf8").split("\n")) {
+        const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+        if (!m || !WANTED.includes(m[1]) || process.env[m[1]]) continue;
+        let v = m[2];
+        if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+        if (v) process.env[m[1]] = v;
+      }
+      if (process.env.OPENAI_API_KEY || process.env.COPILOT_API_KEY) break;
+    } catch {
+      // ignore — graceful 503 path handles a missing/unreadable .env
+    }
+  }
+}
+
 export async function POST(req: NextRequest): Promise<Response> {
+  ensureRootEnv();
   const apiKey = process.env.OPENAI_API_KEY ?? process.env.COPILOT_API_KEY;
   if (!apiKey) {
     // No LLM key configured — the page + readable/HITL actions still work; only live chat needs this.

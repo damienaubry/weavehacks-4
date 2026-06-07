@@ -5,8 +5,8 @@ spine** (reusable orchestration/observability/inference) and the **Brigade domai
 agents, the canon, the data). The judged number — **GRPR** — is produced by the domain harness and
 traced through the spine. The whole pipeline is wired end-to-end and `pnpm typecheck` is green.
 
-> Legend: **[live]** = shipped and runnable. (As of this writing every box below is live; the only
-> "not yet" is the dataset content — see the status note at the end.)
+> Legend: **[live]** = shipped and runnable. Every box below is live, end-to-end — the dataset is now
+> 48 real-derived cases (30 verbatim real Google reviews, 18 synthetic). See the status note at the end.
 
 ## The two layers
 
@@ -22,7 +22,7 @@ traced through the spine. The whole pipeline is wired end-to-end and `pnpm typec
             ┌───────────────┴──────────────── DOMAIN (Brigade) ──────────────┴──────────────────┐
             │  agents                          truth (CANON)            seed (curated, NOT canon) │
             │  roles.ts manifest       [live]  menu/prices/hours [live] recovery cases   [live]   │
-            │  tools/ (Weave-traced)   [live]  policy canon       [live]  (12 synthetic, 0 real)  │
+            │  tools/ (Weave-traced)   [live]  policy canon       [live]  (48: 30 real/18 synth)  │
             │  grounding.checkGrounding[live]  + mechanical policy detectors  validate-cases [live]│
             │  recovery-stations       [live]  menuItem / replyHasDisclosure  legacy orders/reviews│
             │  recovery-pipeline       [live]                                                     │
@@ -127,11 +127,12 @@ there are no baked-in values.
 - **Layer 2 — across runs:** `@weavehacks/memory` failure-cards
   ([`packages/memory`](../packages/memory)) store what failed (`failure_tags`, `missing_evidence`,
   `bad_pattern`, `patch_exemplar`); the team+memory variant retrieves them (similarity + tag filter)
-  before drafting so it stops repeating an over-promise → `team+memory` beats `team`. The store is
-  reset before the team+memory pass and warmed only in chronological order (no leakage; `split.ts`
-  provides `chronologicalSplit` / `auditLeakage` / `assertNoLeakage`). **Honesty guard:** the
+  before drafting so it stops repeating an over-promise — the design intent is `team+memory` ≥ `team`.
+  The store is reset before the team+memory pass and warmed only in chronological order (no leakage;
+  `split.ts` provides `chronologicalSplit` / `auditLeakage` / `assertNoLeakage`). **Honesty guard:** the
   harness's `HonestComparison` reports whether memory beat team *cleanly*; if not, it says so and
-  falls back to the Layer-1 v1→v2 rescue count. Never inflate.
+  falls back to the Layer-1 v1→v2 rescue count. (On the captured fast slice it did **not** — 80% < 100%
+  — so we report the within-session rewrite instead.) Never inflate.
 - **Layer 3 — lifetime [coda]:** Forge spawns new agents. Stretch only (not built).
 
 ## Status snapshot
@@ -139,8 +140,13 @@ there are no baked-in values.
 The spine, the legacy live paths (`pnpm prep` / `pnpm grounding` / `pnpm compare`), and the full
 recovery pipeline (four stations, the `scoreCase`/`runRecoveryHarness` harness, `policy_lookup` +
 policy canon, the `@weavehacks/memory` package, and the web `/recovery` view with CopilotKit) are all
-wired and typecheck-green. The remaining gap is **dataset content**: the shipped slice is **12
-clearly-marked synthetic cases (0 real)** covering all nine incident types; the operator loads the
-real Google reviews to reach the "majority `source:"real"`" target. Menu/prices/hours and the policy
-limits are demo-plausible placeholders pending operator validation. See [`repo-audit.md`](repo-audit.md)
-for the file-by-file split.
+wired and typecheck-green. The dataset is **48 real-derived cases — 30 verbatim from Le Kyoto's real
+Google reviews (majority `source:"real"`, the target met) + 18 clearly-marked synthetic variants** for
+the rarer incident types (Le Kyoto is genuinely 4.7★, so the harshest cases are mostly synthetic —
+presented honestly). The fast demo slice is **8 cases**, the judged run **16** — both just point
+`RECOVERY_CASES_PATH` at a smaller JSON (`recovery-cases.fast.json` / `.demo.json`); the harness has no
+case cap. Real captured result (fast slice, `recovery-report.json`): **solo 60% < team 100%**, solo on
+nearly 2× the tokens (117,830 vs 65,197) — the gap is the Verifier; `team+memory` was neutral on this
+small slice (80%). Menu/prices/hours and the policy gesture limits remain demo-plausible placeholders
+pending operator validation (the shape is locked). See [`repo-audit.md`](repo-audit.md) for the
+file-by-file split.

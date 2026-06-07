@@ -16,6 +16,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchRecovery,
   ticketFor,
+  pct,
+  memorySummary,
   type RecoveryReport,
 } from "../lib/recovery";
 import { RecoveryLeaderboard } from "../components/RecoveryLeaderboard";
@@ -90,10 +92,15 @@ export default function RecoveryPage() {
   }
 
   const banner = mocked
-    ? { text: "preview · API offline — showing staged sample data with the live shape", tone: "var(--warn)" }
+    ? { text: "preview · showing the last recorded GRPR run — the API isn’t warmed (run pnpm recovery for live)", tone: "var(--warn)" }
     : report.placeholder
-      ? { text: "preview · placeholder numbers — the live GRPR harness (WS-C) is being wired", tone: "var(--warn)" }
+      ? { text: "preview · placeholder numbers — run pnpm recovery to compute the live GRPR scoreboard", tone: "var(--warn)" }
       : null;
+
+  // Honest, data-driven hero copy — never claim memory "improves again" when the data says otherwise.
+  const mem = memorySummary(report.rows);
+  const soloRow = report.rows.find((r) => r.variant === "solo");
+  const teamRow = report.rows.find((r) => r.variant === "team");
 
   return (
     <CopilotLayer report={report} stage={stage} hitl={hitl} decide={decide} replay={replay}>
@@ -123,7 +130,7 @@ export default function RecoveryPage() {
                 }}
               >
                 <span style={{ width: 7, height: 7, borderRadius: 999, background: mocked ? "var(--warn)" : "var(--accent)" }} />
-                {mocked ? "mock" : "live"} · /recovery
+                {mocked ? "staged" : "live"} · /recovery
               </span>
               <ThemeToggle />
             </div>
@@ -139,9 +146,20 @@ export default function RecoveryPage() {
                 One review → a grounded recovery package
               </h1>
               <p style={{ color: "var(--muted)", fontSize: 15, maxWidth: 760, margin: 0, lineHeight: 1.55 }}>
-                On {report.dataset.n} held-out cases at matched compute, the multi-agent team beats the best solo on{" "}
-                <strong style={{ color: "var(--text)" }}>GRPR</strong>, then improves again after automatic memory of the
-                Critic&apos;s feedback — every claim traced to the query that proves it in Weave.
+                On {report.dataset.n} held-out cases — with the solo given ≥ the team&apos;s compute — the multi-agent
+                team lifts <strong style={{ color: "var(--text)" }}>GRPR</strong>
+                {soloRow && teamRow ? (
+                  <>
+                    {" "}from <strong style={{ color: "var(--text)" }}>{pct(soloRow.grpr)}</strong> to{" "}
+                    <strong style={{ color: "var(--text)" }}>{pct(teamRow.grpr)}</strong>
+                    {mem.soloToTeam !== null ? ` (+${mem.soloToTeam} pts)` : ""}
+                  </>
+                ) : null}
+                .{" "}
+                {mem.memoryHelps === "up"
+                  ? `Across-run memory adds another +${mem.teamToMemory} pts.`
+                  : "The self-improvement you can watch live is the Verifier driving the Writer’s v1→v2 rewrite; across-run memory is neutral on this small slice."}{" "}
+                Every claim is traced to the query that proves it in Weave.
               </p>
               {banner && (
                 <p style={{ color: banner.tone, fontSize: 12.5, marginTop: 12 }}>{banner.text}</p>

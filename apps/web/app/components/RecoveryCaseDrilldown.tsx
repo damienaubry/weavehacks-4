@@ -6,11 +6,13 @@
  * when the win came from a past failure-card. This is where "solo ships it, the team blocks it"
  * becomes visible.
  */
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   classifyFailReason,
   FAIL_META,
   ledgerFor,
+  INCIDENT_LABEL,
+  caseSource,
   type RecoverySampleCase,
 } from "../lib/recovery";
 
@@ -21,20 +23,9 @@ const panel: CSSProperties = {
   padding: 18,
 };
 
-const INCIDENT_LABEL: Record<string, string> = {
-  food_quality: "Food quality",
-  delivery_late: "Late delivery",
-  wrong_or_missing_item: "Wrong / missing item",
-  allergen_concern: "Allergen concern",
-  hygiene: "Hygiene",
-  service_staff: "Service / staff",
-  pricing_billing: "Pricing / billing",
-  praise_no_issue: "Praise",
-  other: "Other",
-};
-
 export function RecoveryCaseDrilldown({ c }: { c: RecoverySampleCase }) {
   const ledger = ledgerFor(c);
+  const isReal = caseSource(c.id) === "real";
   return (
     <section style={{ ...panel, padding: 22 }} aria-label="case drill-down">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -55,7 +46,7 @@ export function RecoveryCaseDrilldown({ c }: { c: RecoverySampleCase }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <span style={{ color: "var(--warn)", letterSpacing: 1 }}>★★☆☆☆</span>
           <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 0.6 }}>
-            real Google review
+            {isReal ? "real Google review" : "synthetic variant"}
           </span>
           <span
             style={{
@@ -81,12 +72,14 @@ export function RecoveryCaseDrilldown({ c }: { c: RecoverySampleCase }) {
         <div
           style={{
             ...panel,
-            borderColor: "color-mix(in srgb, var(--danger) 45%, var(--border))",
+            border: "1px solid color-mix(in srgb, var(--danger) 45%, var(--border))",
             background: "color-mix(in srgb, var(--danger) 5%, var(--panel))",
           }}
         >
           <Header tone="bad" title="Solo agent" verdict="ships it" />
-          <p style={{ fontSize: 14, lineHeight: 1.55, margin: "10px 0 12px" }}>{c.solo.reply}</p>
+          <p style={{ fontSize: 14, lineHeight: 1.55, margin: "10px 0 12px" }}>
+            <GestureHighlight text={c.solo.reply} tone="bad" />
+          </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {c.solo.failReasons.map((r, i) => {
               const meta = FAIL_META[classifyFailReason(r)];
@@ -119,12 +112,14 @@ export function RecoveryCaseDrilldown({ c }: { c: RecoverySampleCase }) {
         <div
           style={{
             ...panel,
-            borderColor: "color-mix(in srgb, var(--accent) 50%, var(--border))",
+            border: "1px solid color-mix(in srgb, var(--accent) 50%, var(--border))",
             background: "color-mix(in srgb, var(--accent) 6%, var(--panel))",
           }}
         >
           <Header tone="good" title="Agent team" verdict="grounded · passes" />
-          <p style={{ fontSize: 14, lineHeight: 1.55, margin: "10px 0 12px" }}>{c.team.reply}</p>
+          <p style={{ fontSize: 14, lineHeight: 1.55, margin: "10px 0 12px", whiteSpace: "pre-line" }}>
+            <GestureHighlight text={c.team.reply} tone="good" />
+          </p>
 
           {/* grounded ledger */}
           <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>
@@ -172,6 +167,36 @@ export function RecoveryCaseDrilldown({ c }: { c: RecoverySampleCase }) {
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Render a reply, visually highlighting its goodwill gesture (e.g. the offending "20% discount" in
+ * red for the solo, the policy-safe "15% credit" in green for the team). This is the contrast that
+ * makes the over-promise vs the bounded gesture legible at a glance.
+ */
+function GestureHighlight({ text, tone }: { text: string; tone: "good" | "bad" }): ReactNode {
+  const re = /\d{1,3}\s*%(?:\s*(?:discount|credit|crédit|off|réduction|reduction|remise|avoir))?/i;
+  const m = text.match(re);
+  if (!m || m.index == null) return <>{text}</>;
+  const color = tone === "bad" ? "var(--danger)" : "var(--accent)";
+  return (
+    <>
+      {text.slice(0, m.index)}
+      <mark
+        title={tone === "bad" ? "Over-promise — exceeds the policy credit limit" : "Policy-safe gesture"}
+        style={{
+          background: `color-mix(in srgb, ${color} 18%, transparent)`,
+          color,
+          fontWeight: 700,
+          padding: "0 4px",
+          borderRadius: 5,
+        }}
+      >
+        {m[0]}
+      </mark>
+      {text.slice(m.index + m[0].length)}
+    </>
   );
 }
 

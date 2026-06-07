@@ -5,7 +5,7 @@
  * three (parity columns prove it), only the orchestration differs. A rising bar IS the thesis.
  */
 import type { CSSProperties } from "react";
-import { pct, type LeaderboardRow, type RecoveryVariant } from "../lib/recovery";
+import { pct, memorySummary, type LeaderboardRow, type RecoveryVariant } from "../lib/recovery";
 
 const panel: CSSProperties = {
   background: "var(--panel)",
@@ -42,10 +42,18 @@ export function RecoveryLeaderboard({
   rows: LeaderboardRow[];
   dataset: { n: number; realCount: number; syntheticCount: number };
 }) {
-  // Parity check: budgets within a tight band ⇒ the gap is orchestration, not compute.
-  const tokens = rows.map((r) => r.budgetTokens);
-  const spread = tokens.length ? (Math.max(...tokens) - Math.min(...tokens)) / Math.max(...tokens) : 0;
-  const parityOk = spread <= 0.1; // ≤10% token spread → "matched compute"
+  // Parity in this design = the solo gets a budget ≥ the team's (self-retries). The honest, strong
+  // story isn't "the budgets match" — it's "the solo had AT LEAST the team's compute and STILL
+  // scored lower", so the gap is attributable to orchestration, not to compute.
+  const find = (v: RecoveryVariant) => rows.find((r) => r.variant === v);
+  const solo = find("solo");
+  const team = find("team");
+  const soloNotStarved =
+    !!solo && !!team && solo.budgetTokens >= team.budgetTokens && solo.budgetCalls >= team.budgetCalls;
+  const soloLoses = !!solo && !!team && solo.grpr < team.grpr;
+  const ratio = solo && team && team.budgetTokens ? solo.budgetTokens / team.budgetTokens : 0;
+  const parityOk = soloNotStarved;
+  const mem = memorySummary(rows);
 
   // ordered deltas (solo→team→team+memory)
   const ordered = [...rows].sort((a, b) => order(a.variant) - order(b.variant));
@@ -61,7 +69,11 @@ export function RecoveryLeaderboard({
           </p>
         </div>
         <span
-          title={parityOk ? "Token budgets within 10% — the gap is orchestration, not compute." : "Budgets diverge — re-check parity."}
+          title={
+            parityOk
+              ? "Solo was given ≥ the team's compute budget (self-retries) and still scored lower — the gap is orchestration, not compute."
+              : "Solo's budget fell below the team's — raise solo self-retries before reading the gap."
+          }
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -139,7 +151,46 @@ export function RecoveryLeaderboard({
         })}
       </div>
 
-      <p style={{ color: "var(--muted)", fontSize: 12, margin: "18px 0 0", lineHeight: 1.5 }}>
+      {/* parity callout — the strong, honest story: solo had MORE compute and still lost */}
+      {solo && team && soloNotStarved && soloLoses && (
+        <div
+          style={{
+            marginTop: 16,
+            padding: "11px 14px",
+            borderRadius: 12,
+            fontSize: 12.5,
+            lineHeight: 1.5,
+            color: "var(--text)",
+            border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)",
+            background: "color-mix(in srgb, var(--accent) 7%, transparent)",
+          }}
+        >
+          <strong>Parity, the honest way.</strong> The solo spent{" "}
+          <strong style={{ fontVariantNumeric: "tabular-nums" }}>{ratio.toFixed(1)}×</strong> the team&apos;s tokens (
+          {solo.budgetTokens.toLocaleString("en-US")} vs {team.budgetTokens.toLocaleString("en-US")}) over{" "}
+          {solo.budgetCalls} vs {team.budgetCalls} calls — and{" "}
+          <strong>still scored {pct(solo.grpr)} vs the team&apos;s {pct(team.grpr)}</strong>. More compute didn&apos;t
+          close the gap; the Verifier did.
+        </div>
+      )}
+
+      {/* honest memory note — never hide team+memory underperforming on a small slice */}
+      {mem.teamToMemory !== null &&
+        (mem.teamToMemory > 0 ? (
+          <p style={{ color: "var(--muted)", fontSize: 12, margin: "12px 0 0", lineHeight: 1.5 }}>
+            <strong style={{ color: "var(--brand)" }}>+{mem.teamToMemory} pts from memory</strong> — across-run
+            failure-card memory stops the team repeating a past over-promise.
+          </p>
+        ) : (
+          <p style={{ color: "var(--muted)", fontSize: 12, margin: "12px 0 0", lineHeight: 1.5 }}>
+            <strong style={{ color: "var(--text)" }}>Honest note:</strong> on this small held-out slice, team+memory
+            didn&apos;t beat team ({mem.teamToMemory} pts) — across-run memory is{" "}
+            <strong>neutral here</strong>. The self-improvement you can watch live is the Verifier driving the
+            Writer&apos;s <strong>v1→v2 rewrite</strong> within a session.
+          </p>
+        ))}
+
+      <p style={{ color: "var(--muted)", fontSize: 12, margin: "12px 0 0", lineHeight: 1.5 }}>
         Toggle the Verifier off and the rate collapses — the gap is{" "}
         <strong style={{ color: "var(--text)" }}>unfakeable</strong>. Every claim is traced to the query that proves it
         in Weave.

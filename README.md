@@ -38,9 +38,29 @@ team+memory     team + Redis failure-cards (stop repeating an over-promise acros
 collapses back toward solo. Unfakeable — same model, same tools, same compute budget; the
 coordination is the only difference.
 
-**On-screen sentence:** _"On N held-out cases derived from Le Kyoto's real reviews, at matched
-compute, our multi-agent team beats the best solo on GRPR, then improves again after automatic
-memory of the Verifier's feedback — every claim traced to the query that proves it in Weave."_
+**On-screen sentence:** _"On held-out cases derived from Le Kyoto's real Google reviews, at matched
+compute, our multi-agent team beats the best solo on GRPR — and it's the Verifier, not extra budget;
+every claim traced to the query that proves it in Weave."_
+
+## The real result
+
+The fast 8-case slice (held-out, matched compute), captured in `recovery-report.json`:
+
+```
+solo         GRPR  60%   ·  117,830 tok / 65 calls
+team         GRPR 100%   ·   65,197 tok / 45 calls   ← +40 pts on nearly HALF the tokens
+team+memory  GRPR  80%   ·   55,164 tok / 34 calls   (cross-run memory; neutral on this small slice)
+```
+
+Solo spent **nearly 2× the tokens** and still scored lower — the per-case parity guard confirms the
+gap is the **Verifier**, not compute. The real sample case is a **1★ Google review** `rc-real-088`
+(_"Very average and tasteless… I do not recommend!"_): the **solo offers a 20% discount** →
+`gesture 20% exceeds the 15% credit limit [over_promise]` → **FAIL**; the **team offers a 15% credit**
+→ **PASS**. The rows above are the **fast iteration slice** (gpt-4o-mini, 8 cases); the **judged run is
+a separate, larger pass — 16 cases on W&B Inference** (`recovery-cases.demo.json`), same harness, same
+three variants, same model — the more robust number. **Honest caveat, baked in:** cross-run memory did
+*not* beat team on this slice (80% < 100%) — the defensible self-improvement is the Verifier's
+within-session v1→v2 rewrite, and the CLI prints that verdict for us to read aloud.
 
 ## The hero loop
 
@@ -57,18 +77,23 @@ HITL     a human approves the public reply + ticket before anything is published
 ```
 
 The live **v1 → v2 rewrite** makes the jump legible; the GRPR makes it measurable. The pre-rewrite
-draft (`draftV1`) and both verdicts are kept on every run for the drill-down.
+draft (`draftV1`) and both verdicts are kept on every run for the drill-down. (The diagram is the
+mechanism; the live demo drills into the **real** case `rc-real-088` above — solo 20% over-promise vs
+team 15% credit. See [`docs/demo-script.md`](docs/demo-script.md).)
 
 ## Real data, real operator
 
 Le Kyoto is a restaurant we actually run — _"this is the system I wish I had."_ That founder story is
 a core asset, so we protect it: **`packages/seed` is a clearly-marked curated slice, never passed off
 as canon**, and **`packages/truth` is the only source of truth** (menu, prices, hours, **policy**).
-The recovery dataset is **derived from real Google reviews** (target: majority `source: "real"`).
-What ships **today** is a curated **12-case synthetic slice** (all `source: "synthetic"`, covering all
-nine incident types) so the harness and front-end run end-to-end before the operator's real reviews
-are loaded; menu/prices/hours and the policy limits are demo-plausible placeholders the operator
-validates with the real numbers. We never guess a fact and call it Le Kyoto's truth.
+The recovery dataset is **derived from Le Kyoto's real Google reviews**: **48 cases — 30 verbatim real
+reviews** (majority `source: "real"`, the target met) **+ 18 clearly-marked synthetic variants** that
+cover the rarer incident types we don't have enough real examples of (Le Kyoto is genuinely 4.7★, so
+the harshest cases are mostly synthetic — we present that honestly). The fast demo slice is **8 cases**
+and the judged run **16** — both just point `RECOVERY_CASES_PATH` at a smaller JSON; the harness has no
+case cap. Menu/prices/hours and the `packages/truth` policy gesture limits are demo-plausible
+placeholders the operator validates with the real numbers — the SHAPE is locked, the values are
+swappable. We never guess a fact and call it Le Kyoto's truth.
 
 ## Run it
 
@@ -82,7 +107,8 @@ Or manually:
 pnpm install
 pnpm seed                              # validate the curated seed slice (no keys, no credits)
 pnpm --filter @weavehacks/seed validate-cases   # strict gate on the recovery dataset (no keys)
-pnpm recovery                          # ⭐ THE judged scoreboard: GRPR solo vs team vs team+memory (real run; also GET /recovery)
+pnpm recovery                          # ⭐ THE judged scoreboard: GRPR solo vs team vs team+memory (live; writes recovery-report.json)
+RECOVERY_CASES_PATH=packages/seed/data/recovery-cases.fast.json pnpm recovery   # fast 8-case slice (cheap iteration)
 pnpm recovery --no-verifier            # the KILL-SHOT: Verifier off → GRPR collapses toward solo
 pnpm dev                               # web (:3000) + api (:3001) — open /recovery
 pnpm health                            # Redis ping + Weave hello-world
@@ -99,15 +125,20 @@ pnpm compare        # legacy stand-in scoreboard: solo vs team, numeric delta (a
 Requirements: Node 20+, pnpm, Docker (for Redis; or bring your own `REDIS_URL`). Copy
 `.env.example` → `.env`. Runtime agents default to **W&B Inference** (`RUNTIME_PROVIDER=wandb`, the one
 `WANDB_API_KEY` powers both Weave tracing and inference); OpenAI is a switchable fallback. Pin the base
-model for every variant with `RECOVERY_MODEL=<id>`. **`pnpm recovery` runs real LLM agents (needs a
-runtime key, spends inference credits) and produces the three rows live** — there are no baked-in
-numbers. **Weave degrades to a no-op without `WANDB_API_KEY`** (the spine still runs), and `pnpm seed`
+model for every variant with `RECOVERY_MODEL=<id>` (W&B Inference default `zai-org/GLM-5.1`; the fast
+slice iterated on OpenAI `gpt-4o-mini`). **`pnpm recovery` runs real LLM agents (needs a runtime key,
+spends inference credits) and produces the three rows live**, then writes them to `recovery-report.json`.
+**`GET /recovery` never runs the harness** — it serves that cache (or a clearly-flagged
+`placeholder:true` stub before the first run), so the front-end is fast and credits are spent only when
+you choose. **Weave degrades to a no-op without `WANDB_API_KEY`** (the spine still runs), and `pnpm seed`
 / `validate-cases` / `pnpm typecheck` need no keys at all.
 
 ## How to verify the claim
 
-1. `pnpm recovery` (or `GET /recovery`) prints three rows with a **budget column** — the CLI's parity
-   guard asserts solo spent ≥ the team's compute, so the gap is the Verifier's, not extra budget.
+1. `pnpm recovery` prints three rows with a **budget column** (`GET /recovery` serves the same numbers
+   from the cache) — the CLI's per-case parity guard asserts solo spent ≥ each team variant, so the gap
+   is the Verifier's, not extra budget. On the fast slice: solo 60% on 117,830 tok vs team 100% on
+   65,197 tok.
 2. Open the Weave traces: each station is an op (`agent.recovery.*`), each case is `recovery.case`,
    each score is `recovery.score` — so every claim links to the query that grounds it.
 3. `pnpm recovery --no-verifier` → watch the GRPR collapse toward solo.
@@ -127,7 +158,7 @@ recovery pipeline is wired end-to-end and `pnpm typecheck` is green.
 | `packages/runtime` | spine | Inference: W&B Inference (default) + OpenAI (fallback), `runToolAgent` tool-loop, `describeRuntime`. | live |
 | `packages/agents` | domain | Role manifest (`roles.ts` + `assertEveryRoleHasConflict`), Weave-traced `tools/` (incl. `policy_lookup`), `grounding.ts` (`checkGrounding`), and the **recovery pipeline** (`recovery-stations` / `recovery-pipeline` / `recovery-score`). | live |
 | `packages/truth` | domain (CANON) | Menu, prices, hours + the **policy canon** (`policy.ts`: 15% max credit, forbidden gestures, mechanical disclosure/forbidden-claim detectors). | live (placeholder values, operator-validated) |
-| `packages/seed` | domain | Curated demo slice. Legacy orders/reviews/weather + the recovery dataset (`data/recovery-cases.json`) + `validate-cases`. | live (12 synthetic cases; operator loads real) |
+| `packages/seed` | domain | Curated demo slice. Legacy orders/reviews/weather + the recovery dataset (`data/recovery-cases.json` + `fast.json`/`demo.json` slices, override `RECOVERY_CASES_PATH`) + `validate-cases`. | live (48 cases — 30 real / 18 synthetic) |
 | `packages/memory` | domain | `@weavehacks/memory` — failure-card store on Redis vector search (→ portable cosine → in-memory fallback) + chronological split & leakage guards. | live |
 | `packages/shared` | spine | `createRedis`, `loadRootEnv`, domain-agnostic `Scoreboard`/`RunResult`. | live |
 | `apps/api` | app | Entrypoint: `GET /health` · `/compare` · `/recovery` + the CLI scripts. `recovery.ts` runs the real harness. | live |

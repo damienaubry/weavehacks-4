@@ -43,7 +43,7 @@ export function RecoveryHITL({
   const anyRejected = state.reply === "rejected" || state.ticket === "rejected";
 
   return (
-    <section style={{ ...panel, borderColor: published ? "color-mix(in srgb, var(--accent) 45%, var(--border))" : "var(--warn)" }} aria-label="human approval gate">
+    <section style={{ ...panel, border: `1px solid ${published ? "color-mix(in srgb, var(--accent) 45%, var(--border))" : "var(--warn)"}` }} aria-label="human approval gate">
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 16 }}>{published ? "✅" : "⚠"}</span>
         <h2 style={{ fontSize: 17, margin: 0 }}>Human sign-off before anything is published</h2>
@@ -136,12 +136,13 @@ function GateItem({
       style={{
         ...panel,
         padding: 14,
-        borderColor:
+        border: `1px solid ${
           decision === "approved"
             ? "color-mix(in srgb, var(--accent) 45%, var(--border))"
             : decision === "rejected"
               ? "color-mix(in srgb, var(--danger) 45%, var(--border))"
-              : "var(--border)",
+              : "var(--border)"
+        }`,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>

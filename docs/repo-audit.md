@@ -26,10 +26,12 @@ and `pnpm grounding` (legacy) still run.
 - **Apps** (`api`, `web`): `api` serves `/recovery` from the **real harness**; `web` renders the
   `/recovery` GRPR view (leaderboard + drill-down + HITL) on CopilotKit alongside the legacy pages.
 
-> **The one remaining gap is dataset content**, not code: the recovery dataset is **12 clearly-marked
-> synthetic cases (0 real)** today; the operator loads the real Google reviews to hit the
-> "majority `source:"real"`" target. Menu/prices/hours and the policy limits are demo-plausible
-> placeholders pending operator validation (the SHAPE is locked).
+> **The dataset is real-derived and complete:** 48 cases — **30 verbatim from Le Kyoto's real Google
+> reviews** (majority `source:"real"`, the target met) + 18 clearly-marked synthetic variants for the
+> rarer incident types. Captured real result (fast 8-case slice, `recovery-report.json`): **solo 60% <
+> team 100%**, solo on nearly 2× the tokens — the gap is the Verifier, not compute. Menu/prices/hours
+> and the policy gesture limits remain demo-plausible placeholders pending operator validation (the
+> SHAPE is locked, the values are swappable).
 
 ---
 
@@ -105,7 +107,8 @@ and `pnpm grounding` (legacy) still run.
 | --- | --- |
 | `recovery-types.ts` | **live** — `IncidentType` (9 values), `RecoveryCase`, `CaseContext`. |
 | `recovery-cases.ts` | **live** — `RECOVERY_CASES` loaded from `data/recovery-cases.json` (override `RECOVERY_CASES_PATH`); tolerant per-case shape check; `INCIDENT_TYPES`; `checkCaseShape`/`extractRawCases`. |
-| `data/recovery-cases.json` | **live (content placeholder)** — **12 synthetic cases, 0 real**, covering all 9 incident types (delivery_late ×2, food_quality ×2, praise_no_issue ×2, the rest ×1). Operator appends real cases. |
+| `data/recovery-cases.json` | **live** — **48 cases: 30 real (verbatim Google reviews) + 18 synthetic**, covering all 9 incident types. `rc-real-088` is the sample drill-down (real 1★, solo 20% over-promise vs team 15%). |
+| `data/recovery-cases.fast.json` · `.demo.json` | **live** — held-out slices the demo points `RECOVERY_CASES_PATH` at: **fast = 8** (5 real / 3 synth, cheap iteration), **demo = 16** (9 real / 7 synth, the judged W&B run). Both include `rc-real-088`. |
 | `validate-cases.ts` | **live (WS-A)** — `pnpm --filter @weavehacks/seed validate-cases`: strict gate that resolves every gold tag against `truth` POLICY + reports the distribution. |
 | `pos.ts` (+ `data/pos.json`) | **live** — real 3-year Hiboutik POS contract + `loadServiceRecords`/`splitTrainHoldout`. |
 | `orders.ts` | **live (stale-ish)** — `ORDERS`, a hand-authored nightly slice powering the live `pnpm prep`. Parallels `pos.json`; migrate analytics tools to `pos.ts`, then retire. |
@@ -162,9 +165,11 @@ Root aliases (`package.json`): `dev` `build` `lint` `typecheck` `seed` `health` 
 
 ## Notes & risks
 
-- **Dataset content is the live gap.** 12 synthetic cases, 0 real today — the harness + UI run
-  end-to-end, but "grounded in real reviews" needs the operator's real cases (majority `source:"real"`).
-  `validate-cases` is the gate that keeps gold labels resolving to the shared POLICY vocabulary.
+- **Dataset is real-derived and complete.** 48 cases — 30 real (verbatim Google reviews) + 18
+  synthetic — majority `source:"real"` (the target met). `validate-cases` is the gate that keeps gold
+  labels resolving to the shared POLICY vocabulary. The judged run uses the 16-case `recovery-cases.demo.json`
+  slice on W&B Inference; the fast 8-case slice (`recovery-cases.fast.json`, gpt-4o-mini) is the cheap
+  iteration loop.
 - **Placeholder canon values.** `truth` menu/prices/hours and the `POLICY` gesture limits are
   demo-plausible, operator-validated — the shape is locked, the values are swappable.
 - **GRPR numbers are live.** `pnpm recovery` runs real LLM agents (needs a runtime key, spends
