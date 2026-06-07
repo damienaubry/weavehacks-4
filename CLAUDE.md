@@ -2,8 +2,9 @@
 
 This file is operating instructions to yourself, not a repo brochure. Read the THESIS first.
 The project IS decided (Brigade) and the two implementation choices (runtime provider,
-orchestration framework) are now RESOLVED (see below). Next up: build the Content → Critic
-HERO LOOP.
+orchestration framework) are now RESOLVED (see below). The JUDGED headline is the **GROUNDING
+RATE** (mechanical, solo vs team — see RESOLVED DECISIONS 2026-06-07). Next up: harden the
+Content → Critic GROUNDING LOOP and its mechanical grounding scoreboard.
 
 ---
 
@@ -31,7 +32,10 @@ demo**, not production.
   team visibly SUCCEEDS**, and we can **PROVE it with numbers in Weave**.
 - Coordination only matters when there's a real **CONFLICT** to resolve. The Critic wants
   data-grounded, specific output; the producing agent just wants to ship. **That clash — and
-  the visible quality jump when it resolves — is the star of the demo.**
+  the jump in GROUNDING when it resolves — IS the judged headline**, measured MECHANICALLY
+  (each claim checked against the real data, not by an LLM judge): solo vs team, **same model
+  and same tools on both sides, so the ONLY difference is the Critic** and the gap is
+  cleanly attributable to coordination (see RESOLVED DECISIONS 2026-06-07).
 - **No decorative agents.** Every agent needs a role AND at least one real conflict or
   dependency with another agent, or it doesn't ship.
 - The deliverable that proves all of this: **"solo scores X, team scores Y"** in Weave, by
@@ -42,21 +46,29 @@ demo**, not production.
 ## OBSERVABILITY + THE BASELINE COME FIRST
 
 Before any breadth, the scoreboard must exist and stay green:
-1. A **SOLO baseline** that does a task alone (e.g. writes the Instagram post in one shot).
-2. The **agent-TEAM** version (producer + Critic loop).
-3. **Weave on BOTH**, same scenario through each, reporting a numeric difference (output
-   quality score; % of claims grounded in a real data source).
+1. A **SOLO baseline** that produces the prep brief / forecast in one shot, with NO Critic —
+   it ships plausible-but-ungrounded claims (the failing baseline).
+2. The **agent-TEAM** version — **same model, same tools** — where the **Critic checks each
+   claim against the real data and BLOCKS until it's grounded**. The Critic is the only added
+   ingredient.
+3. **Weave on BOTH**, same scenario through each, reporting a numeric difference — primarily
+   the **GROUNDING RATE (% of claims supported by the real data), measured MECHANICALLY**, with
+   **forecast error (sMAPE on held-out years, ~42→40)** as an honest, modest SECONDARY number.
 
-Weave is our **SCOREBOARD, not just logging.** Headline demo line: *"solo agent scores 5/10
-and hallucinates; our team scores 8.5/10 with every claim traced to POS/reviews — here's the
-Weave trace."* Keep `pnpm compare` runnable after every change.
+Weave is our **SCOREBOARD, not just logging.** Headline demo line: *"the solo agent ships N
+ungrounded claims (rain→soba folklore the POS data flatly contradicts); add ONE Critic — same
+model, same tools — and grounding goes from X% to ~100%, every claim traced to the query that
+proves it. The forecast number barely moves; the trustworthiness does."* Keep `pnpm compare`
+runnable after every change.
 
 > Current state: the **Brigade discussion team is live** (`pnpm prep`) — real LLM agents
 > (Chef/Historian/Scout/Prep) coordinating on a "prep for Friday" turn over W&B Inference, with
-> tools + every turn traced in Weave. The numeric **solo-vs-team eval** over this team is the next
-> step (deferred for now); until then the `compare`/`demo` scoreboard runs on a deterministic
-> stand-in scenario (`apps/api/src/scenario.ts`, generic `record_*`) so the harness stays green.
-> When we wire the eval, `compareSoloVsTeam` does NOT change — only the scenario plugged in does.
+> tools + every turn traced in Weave. The `compare`/`demo` scoreboard still scores the synthetic
+> `record_*` stand-in scenario (`apps/api/src/scenario.ts`) so the harness stays green. The
+> KEYSTONE in progress: wiring the **mechanical GROUNDING eval** (each claim in the prep brief
+> checked against `pos.json`; grounding rate solo vs team) into `compareSoloVsTeam` — swap the
+> scenario, harness unchanged. The contextual-vs-naive forecast backtest stays as the modest
+> SECONDARY number (sMAPE on held-out years), NOT the headline.
 
 ---
 
@@ -90,8 +102,11 @@ CHEF: → presents prep sheet + approved post to user
 ```
 
 What makes it real multi-agent (not one LLM in a trenchcoat): **the Critic wants something
-different than Content and BLOCKS it until grounded.** The 5→8.5 jump is visible live and fully
-traced in Weave. This loop is the demo's spine. Everything else is additive.
+different than Content and BLOCKS it until every claim is grounded.** The judged headline is the
+**GROUNDING RATE, measured mechanically** — solo ships ungrounded claims, the team drives them to
+~100%, same model and tools on both sides (only the Critic differs). The live 5→8.5 critic score
+is the on-stage **qualitative beat of conflict resolution** that makes the jump legible; the
+mechanical grounding rate is the number that gets judged. Everything else is additive.
 
 ---
 
@@ -107,9 +122,13 @@ traced in Weave. This loop is the demo's spine. Everything else is additive.
   Friday is rain + a PSG derby + a school holiday + a transport strike." A solo agent picks one
   lens and is wrong; the team surfaces the contradiction and Prep reconciles it.
 
+**The HERO pairing — NOT cuttable (this is the judged headline):**
+- **Content** (producer) + **Critic**: the producer drafts the data-grounded output (prep brief /
+  post); the **Critic checks each claim against the real data and BLOCKS until grounded**. Headline
+  = **grounding rate, measured mechanically, solo vs team** (same model + tools, only the Critic
+  differs); the 1–10 score is the live qualitative beat.
+
 **Next layer (additive, cuttable):**
-- **Content** + **Critic**: data-grounded social post; Critic scores 1–10 and BLOCKS until grounded
-  (the 5→8.5 jump — the eventual scoreboard star).
 - **Promo**: slow periods → targeted offers.  **Reviews**: review vector search → insights.
 - **Forge** (coda): detects a capability gap, scaffolds a NEW agent. 15-second coda only.
 
@@ -124,8 +143,11 @@ Each agent's role + its conflict/dependency live as data in `packages/agents/src
 
 ## SELF-IMPROVEMENT (3 layers — Layer 1 is the hero, 2 and 3 are bonus)
 
-- **Layer 1 (within session):** Critic forces rewrites until quality threshold. **THE STAR.**
-- **Layer 2 (across runs):** Redis stores scores + feedback so agents don't repeat mistakes.
+Self-improvement = the **GROUNDING RATE rising**, shown two ways:
+- **Layer 1 (within session):** the Critic forces rewrites until every claim is grounded —
+  grounding climbs v1→v2 live. **THE STAR.**
+- **Layer 2 (across runs):** Redis stores scores + feedback so agents don't repeat the same
+  ungrounded claims — grounding rate trends up across runs.
 - **Layer 3 (lifetime):** Forge spawns new agents. Coda only.
 
 ---
@@ -146,6 +168,30 @@ revisit either, STOP and ask the team first.
    polls `/compare`. No LangGraph, no CopilotKit — the Critic-rewrite loop fits the direct-call
    model directly, and the scoreboard is already green. (CopilotKit/LangGraph stay on the table
    only as a post-hero-loop polish if time allows — ask before adopting.)
+
+## RESOLVED DECISIONS (2026-06-07) — do not re-litigate
+
+This one sets WHICH NUMBER gets judged. If you want to revisit it, STOP and ask the team first.
+
+**THE JUDGED HEADLINE NUMBER — RESOLVED: the GROUNDING RATE, measured MECHANICALLY.** The solo
+producer vs the producer+Critic team, scored by the **% of claims in the produced output that are
+actually supported by the real `pos.json`/reviews data — checked programmatically, NOT by an LLM
+judge** — traced in Weave. **Same model + same tools on both sides; the ONLY difference is the
+Critic**, so the grounding gap is cleanly attributable to coordination. This is the **unfakeable
+proof**: a judge who toggles the Critic off watches the grounding rate collapse. **SELF-IMPROVEMENT**
+shows as the grounding rate rising — within a session (v1→v2 rewrites) and across runs (Redis
+feedback).
+
+> **SUPERSEDES the earlier 2026-06-07 call that made the FORECAST BACKTEST the headline.** A
+> ~30-agent backtest + adversarial verification on the real POS proved there is **no honest, big
+> solo-vs-team gap on forecast accuracy**: growth (~+23% YoY) is the only large effect and a SOLO
+> trend term owns it; the context signals (weather/football/events) are real but swamped by
+> per-service noise and don't move total sMAPE (toggling them OFF changes nothing a judge would
+> see). The forecast-first experiment was still worth running — it's what told us where NOT to
+> invest. So the forecast is kept as the agents' **TASK** and an honest **modest SECONDARY number
+> (~42→40 sMAPE)**, NOT the proof; the Content→Critic GROUNDING mechanism is RE-PROMOTED to the
+> headline, where the multi-agent gap is genuinely big and unfakeable. See
+> `docs/solo-vs-team-research.md` and the memory note `forecast-accuracy-not-thesis-proof`.
 
 ---
 
