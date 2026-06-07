@@ -2,7 +2,7 @@
 
 ---
 
-## Slide: Introduction
+## Slide 1: Introduction
 
 ### Texte de la slide
 
@@ -14,8 +14,7 @@
 ┌─────────────────────────────────────────────────────┐
 │                                                     │
 │  🍜 LE KYOTO                                       │
-│  Japanese takeout restaurant · near Paris           │
-│  4.7★ on Google · real business, real customers     │
+│  Japanese takeout · near Paris · 4.7★ on Google     │
 │                                                     │
 │  THE PROBLEM                                        │
 │  A bad review needs a fast, accurate response.      │
@@ -29,13 +28,9 @@
 │     ✅ Internal action ticket                       │
 │     🔒 Nothing publishes without human approval     │
 │                                                     │
-│  THE DATASET                                        │
-│  48 cases:                                          │
-│     30 real Google reviews (verbatim)               │
-│     18 synthetic variants                           │
-│                                                     │
-│  "My restaurant is rated 4.7★ — I needed more of   │
-│   the angry ones to stress-test the system."        │
+│  "My restaurant is 4.7★ — I needed more of the     │
+│   angry ones to stress-test the system."            │
+│   → 30 real reviews + 18 synthetic edge cases      │
 │                                                     │
 └─────────────────────────────────────────────────────┘
 ```
@@ -44,52 +39,48 @@
 
 ### Questions du jury que cette slide répond
 
-**Q1: "Why synthetic reviews? Is this cheating?"**
+**Q1: "Is this a real business or a hackathon toy?"**
 
-> Réponse orale : "My restaurant is 4.7 stars — I have some angry reviews, but not enough variety. Food poisoning claims, repeated wrong orders, aggressive customers — these happen rarely at Le Kyoto. So I generated 18 synthetic ones to cover those edge cases. All clearly labeled. The 30 real ones are the core benchmark, the synthetic ones stress-test the long tail."
+> Réponse orale : "I operate Le Kyoto. Real Google reviews, real customers. The policy — 15% max credit, no free meals — is our actual business rule. This is not a demo dataset."
 
-**Q2: "Is this a real business or a hackathon toy?"**
+**Q2: "Why synthetic reviews?"**
 
-> Réponse orale : "I operate Le Kyoto. These are real Google reviews from real customers. The policy — 15% max credit, no free meals — is our actual business rule. This isn't a demo dataset, it's my restaurant's reputation on the line."
+> Réponse orale : "My restaurant is 4.7 stars. Allergen scares, hygiene problems — they rarely happen at Le Kyoto. But the system must handle them. So I generated 18 edge cases to stress-test. All clearly labeled. The 30 real ones are the core benchmark."
 
-**Q3: "What does 'grounded' mean exactly?"**
+**Q3: "What does 'grounded' mean?"**
 
-> Réponse orale : "Every claim in the reply must trace back to a tool result. If the agent says '15% credit', the policy tool must confirm that's within limits. If it says 'we're sorry about the missing items', the review must actually mention missing items. No claim without a source. That's what grounded means."
+> Réponse orale : "Every claim in the reply must trace back to a tool result. If the agent says the order was missing items, a tool result must confirm it. No claim without a source."
 
 ---
 
-## Slide: What It Does (Concrete Example)
+## Slide 2: What It Does
 
 ### Texte de la slide
 
-**Title:** One review in → Full recovery package out
+**Title:** One review in, full recovery package out
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                                                     │
-│  INPUT (real Google review)                         │
-│  ★★☆☆☆                                             │
-│  "Very average and tasteless… I do not recommend!"  │
+│  INPUT                                              │
+│  ★★☆☆☆ "Inadmissible, il manque la moitié de la    │
+│  commande !"                                        │
 │                                                     │
 │                      ↓                              │
 │                                                     │
-│  OUTPUT (3 things)                                  │
+│  OUTPUT                                             │
 │                                                     │
-│  1️⃣ TRIAGE                                         │
-│     → food_quality                                  │
+│  1. TRIAGE → wrong_or_missing_item                  │
 │                                                     │
-│  2️⃣ PUBLIC REPLY (grounded)                        │
-│     "We're sorry your meal didn't meet              │
-│      expectations. We'd like to offer you a         │
-│      15% credit on your next order."                │
-│     → every claim backed by a tool result           │
-│     → nothing exceeds policy limits                 │
+│  2. PUBLIC REPLY                                    │
+│     "We'd like to offer you a 10€ credit           │
+│      on your next order."                           │
+│     → backed by policy_lookup (within 15% cap) ✓    │
 │                                                     │
-│  3️⃣ INTERNAL TICKET                                │
-│     Severity: medium · Owner: kitchen               │
-│     Action: review seasoning consistency            │
+│  3. INTERNAL TICKET                                 │
+│     high · ops · re-send missing items              │
 │                                                     │
-│  🔒 Human approves before anything goes public      │
+│  🔒 Human approves → then it goes public            │
 │                                                     │
 └─────────────────────────────────────────────────────┘
 ```
@@ -98,56 +89,44 @@
 
 ### Questions du jury que cette slide répond
 
-**Q1: "So what does it actually DO?"**
+**Q1: "Why not just use ChatGPT?"**
 
-> Réponse orale : "You give it one Google review. It gives you three things: a triage — what type of incident is this. A public reply that's grounded — every claim traces back to real data, no hallucinated promises. And an internal ticket so your team knows what to fix. Nothing goes out without human approval."
+> Réponse orale : "ChatGPT will happily offer a free meal or a 50% refund. Things I cannot give. My system is constrained by my real policy. It can only promise what I authorized. That's the difference."
 
-**Q2: "What types of incidents does it handle?"**
+**Q2: "What types of incidents?"**
 
-> Réponse orale : "Food quality, wrong or missing items, allergen concerns, hygiene issues, late delivery, staff complaints, pricing disputes. Nine categories total. The triage is the first step — it determines how the rest of the pipeline behaves."
-
-**Q3: "Why not just use ChatGPT to reply to reviews?"**
-
-> Réponse orale : "ChatGPT will happily offer a free meal or a 50% refund — things I can't actually give. My system is constrained by my real business policy. It can only promise what I've authorized. That's the difference between a chatbot and an operational tool."
+> Réponse orale : "Food quality, missing items, allergens, hygiene, late delivery, staff, pricing. Nine categories. The triage decides how the pipeline behaves."
 
 ---
 
-## Slide: The Dataset
+## Slide 3: Solo vs Team (The Core Proof)
 
 ### Texte de la slide
 
-**Title:** Real reviews, real edge cases
+**Title:** Same model, same tools. Only orchestration changes.
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                                                     │
-│  48 CASES                                           │
+│  SOLO AGENT (fails)                     ❌ 80%     │
+│  states "missing items in the order"…               │
+│  → No tool result backs that claim. UNGROUNDED.     │
+│  → 225K tokens spent. Still fails one check.         │
 │                                                     │
-│  30 REAL (verbatim from Google)                     │
-│  ──────────────────────────────                     │
-│  "Inadmissible, il manque la moitié                 │
-│   de la commande. Ce n'est pas normal"              │
-│   → wrong_or_missing_item                           │
+│  ─────────────────────────────────────────────────  │
 │                                                     │
-│  "Un peu déçue... les ramens m'ont                  │
-│   le plus déçue"                                    │
-│   → food_quality                                    │
+│  TEAM (passes)                          ✅ 90%     │
+│  "...offer you a 10€ credit..."                     │
+│  → Verifier flags the ungrounded claim. BLOCKED.    │
+│  → Writer rewrote — grounded. Now passes.           │
+│  → 151K tokens. Fewer than solo, better result.     │
 │                                                     │
+│  ─────────────────────────────────────────────────  │
 │                                                     │
-│  18 SYNTHETIC (edge cases that rarely happen)       │
-│  ──────────────────────────────────────────         │
-│  "J'avais précisé mon allergie à l'arachide...      │
-│   j'ai fait une réaction en rentrant"               │
-│   → allergen_concern                                │
-│                                                     │
-│  "J'ai trouvé un cheveu dans mon yakisoba"          │
-│   → hygiene                                         │
-│                                                     │
-│                                                     │
-│  WHY SYNTHETIC?                                     │
-│  Le Kyoto is 4.7★ — allergen scares, hygiene        │
-│  incidents are rare. But the system must handle     │
-│  them. Synthetic = stress-testing the long tail.    │
+│  TEAM + MEMORY (cheapest)               ⚡ 80%     │
+│  → Cross-run memory: 91K tokens, 61 calls.          │
+│  → Honest result: 80% — did not beat team here.     │
+│  → Cheapest of all three.                           │
 │                                                     │
 └─────────────────────────────────────────────────────┘
 ```
@@ -156,59 +135,92 @@
 
 ### Questions du jury que cette slide répond
 
-**Q1: "How do you know the synthetic ones are realistic?"**
+**Q1: "Why does solo fail if it has the same tools?"**
 
-> Réponse orale : "They're modeled on real review patterns from the restaurant industry — same language, same complaints, just for incident types Le Kyoto rarely gets. And they're clearly labeled in the dataset. The GRPR metric runs on both — if the system handles a synthetic allergen case correctly, it'll handle a real one too."
+> Réponse orale : "It has the tools. But it has conflicting objectives — write a fluent reply AND keep every claim grounded — in one context. The model's training pushes it to sound natural, so it asserts a fact the data never backed. The Verifier has one job: check that each claim has a source. No conflict."
 
-**Q2: "Why not just use more restaurants' data?"**
+**Q2: "How is this fair? Solo has less compute?"**
 
-> Réponse orale : "Because the policy, menu, and pricing are specific to Le Kyoto. The grounding check verifies claims against OUR tools — our menu prices, our credit policy. Using another restaurant's reviews wouldn't test our grounding pipeline. The value is that it's end-to-end real for one business."
-
-**Q3: "48 cases — isn't that too small?"**
-
-> Réponse orale : "For a hackathon proof-of-concept, 48 cases with a binary mechanical metric is solid. The GRPR gap is 40 points — that's not noise. And the kill-shot confirms it: disable the Verifier, the score collapses. You don't need 10,000 cases to prove coordination matters when one flag flips the result."
+> Réponse orale : "Solo actually spends MORE — 225K tokens versus 151K for the team. It self-revises three times. Same budget, more compute, worse result. The issue is not compute, it's the quality of feedback."
 
 ---
 
-## Slide: How We Use Weave
+## Slide 4: Blind Revision vs Targeted Feedback
 
 ### Texte de la slide
 
-**Title:** Every claim is a Weave op
+**Title:** 3 blind revisions < 1 targeted rewrite
+
+```
+┌─────────────────────────────────────────────────────┐
+│  SOLO: revises blind                                │
+│                                                     │
+│  Draft → "Revise: be warmer" → "be warmer" → same  │
+│                                                     │
+│  ❌ Never told WHAT is wrong                        │
+│  ❌ "Be warmer" = be MORE generous = worse          │
+│  ❌ More tokens (225K), still fails one check      │
+│                                                     │
+│  ─────────────────────────────────────────────────  │
+│                                                     │
+│  TEAM: targeted fix                                 │
+│                                                     │
+│  Draft → Verifier: "claim not in the evidence      │
+│  ledger" → fix it                                   │
+│                                                     │
+│  ✅ Knows EXACTLY what to fix                       │
+│  ✅ One rewrite, done                               │
+│  ✅ Targeted fix (151K tokens), passes             │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+
+Like proofreading your own essay 3 times
+     vs. a colleague saying "that claim has no source."
+```
+
+---
+
+### Questions du jury que cette slide répond
+
+**Q1: "Why not just prompt the solo to check policy?"**
+
+> Réponse orale : "We tried. It revises three times and still slips in a claim no tool result backs. Having information is not the same as following it. Same reason a developer who reads the style guide still needs code review."
+
+**Q2: "Is the Verifier just another LLM?"**
+
+> Réponse orale : "The core check is mechanical. Claim not found in any tool result? Block. Credit percent exceeds 15? Block. It's code-level verification, not a vibe check."
+
+---
+
+## Slide 5: Weave — Full Traceability
+
+### Texte de la slide
+
+**Title:** Not a black box — every decision is traceable
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                                                     │
-│  21 traced() decorators across the pipeline         │
+│  WEAVE TRACE (one recovery case):                   │
 │                                                     │
-│  WHAT'S TRACED:                                     │
+│  recovery.case                                      │
+│  ├── agent.curator                                  │
+│  │   ├── tool.get_reviews ✓                         │
+│  │   ├── tool.policy_lookup ✓                       │
+│  │   └── tool.get_menu ✓                            │
+│  ├── agent.analyst                                  │
+│  │   └── triage: wrong_or_missing_item ✓            │
+│  ├── agent.writer                                   │
+│  │   └── draft v1: ungrounded claim ⚠️             │
+│  ├── agent.verifier                                 │
+│  │   └── BLOCKED: claim not in ledger ❌           │
+│  ├── agent.writer (rewrite)                         │
+│  │   └── draft v2: all claims grounded ✓            │
+│  └── agent.verifier                                 │
+│      └── PASS ✅                                    │
 │                                                     │
-│  Agent calls                                        │
-│  ├── recovery.case (full case run)                  │
-│  ├── agent.recovery.curator                         │
-│  ├── agent.recovery.analyst                         │
-│  ├── agent.recovery.writer                          │
-│  └── agent.recovery.verifier                        │
-│                                                     │
-│  Tool executions                                    │
-│  ├── tool.policy_lookup                             │
-│  ├── tool.get_reviews                               │
-│  ├── tool.get_menu                                  │
-│  └── tool.demand_baseline                           │
-│                                                     │
-│  Memory operations                                  │
-│  ├── memory.embed                                   │
-│  ├── memory.writeFailureCard                        │
-│  └── memory.retrieveFailureCards                    │
-│                                                     │
-│  WHY IT MATTERS:                                    │
-│  Solo says "15% credit" → open Weave →              │
-│  trace back to policy_lookup → tool returned        │
-│  maxCreditPct: 15 → claim is GROUNDED.              │
-│                                                     │
-│  Solo says "20% discount" → open Weave →            │
-│  no tool ever returned 20 → UNGROUNDED.             │
-│  That's how the Verifier catches it.                │
+│  → Click any node → see input, output, tokens       │
+│  → The Verifier's block is PROVABLE in Weave        │
 │                                                     │
 └─────────────────────────────────────────────────────┘
 ```
@@ -217,55 +229,42 @@
 
 ### Questions du jury que cette slide répond
 
-**Q1: "How do you use Weave specifically?"**
+**Q1: "How do you use Weave?"**
 
-> Réponse orale : "Every agent call, every tool execution, every memory operation is a Weave op. 21 traced decorators total. You can open any case, drill into the Curator's tool calls, see what the policy_lookup returned, and trace exactly why the Verifier passed or blocked. It's full observability on the multi-agent pipeline. Not a black box."
+> Réponse orale : "21 traced decorators. Every agent, every tool, every memory operation is a Weave op. You can open any case and see exactly which claim was blocked, which tool returned which value, and why. It's a debugger for multi-agent coordination."
 
 **Q2: "Could you build this without Weave?"**
 
-> Réponse orale : "You could build the agents, sure. But you couldn't PROVE the grounding. The whole point of GRPR is that every claim traces back to a tool result. Weave makes that audit trail visible and inspectable. Without it, you're trusting the system. With it, you're verifying it."
-
-**Q3: "What does a Weave trace look like for one case?"**
-
-> Réponse orale : "You see the full tree: recovery.case at the top, then Curator with its 4-5 tool calls nested inside, then Analyst, then Writer, then Verifier. Each tool call shows input and output. When the Verifier blocks, you see the exact claim that failed and the tool result it should have matched. It's a debugger for multi-agent coordination."
+> Réponse orale : "You could build agents. But you could not PROVE the grounding. Weave makes the audit trail visible. Without it, you trust the system. With it, you verify it."
 
 ---
 
-## Slide: How We Use Redis
+## Slide 6: Redis — System Memory
 
 ### Texte de la slide
 
-**Title:** Failure cards = persistent memory
+**Title:** Learns from mistakes, no retraining
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                                                     │
-│  REDIS = the system's long-term memory              │
+│  CASE N:                                            │
+│  Writer → ungrounded claim → Verifier BLOCKS        │
+│       ↓                                             │
+│  Failure card → Redis                               │
+│  { tag: "ungrounded", lesson: "cite the order" }    │
 │                                                     │
-│  HOW IT WORKS:                                      │
+│  CASE N+1 (similar complaint):                      │
+│  Retrieve card → Writer sees lesson BEFORE writing  │
+│       ↓                                             │
+│  Cites the evidence first try. No rewrite.          │
 │                                                     │
-│  Case N: Writer drafts "20% off"                    │
-│          Verifier BLOCKS                            │
-│              ↓                                      │
-│          Write failure card to Redis:               │
-│          {                                          │
-│            tags: ["over_promise", "food_quality"],   │
-│            lesson: "max 15% — never exceed policy", │
-│            embedding: [0.23, -0.41, ...]            │
-│          }                                          │
+│  ─────────────────────────────────────────────────  │
 │                                                     │
-│  Case N+1 (similar review comes in):               │
-│          Retrieve top-3 cards by similarity         │
-│              ↓                                      │
-│          Writer sees past lessons BEFORE drafting   │
-│              ↓                                      │
-│          Drafts "15% credit" on first attempt       │
-│          No rewrite needed. Fewer tokens.           │
-│                                                     │
-│  THREE TIERS (graceful degradation):                │
-│  1. RediSearch (FT.SEARCH + KNN vector search)      │
-│  2. Plain Redis (key-value + cosine in JS)          │
-│  3. In-memory fallback (no persistence)             │
+│  TECH: RediSearch + vector KNN                      │
+│  → Similarity search by incident type               │
+│  → Top-3 relevant failure cards retrieved           │
+│  → Three-tier fallback (never crashes)              │
 │                                                     │
 └─────────────────────────────────────────────────────┘
 ```
@@ -274,70 +273,131 @@
 
 ### Questions du jury que cette slide répond
 
-**Q1: "Why Redis specifically?"**
+**Q1: "Why Redis for memory?"**
 
-> Réponse orale : "We need persistent, fast retrieval of structured failure cards with tag filtering and vector similarity. Redis with RediSearch gives us KNN vector search with pre-filtering by incident type — in one query. And it's a sponsor, so we built a real integration, not a wrapper."
+> Réponse orale : "Fast, persistent, and RediSearch gives us vector KNN with tag pre-filtering in one query. We retrieve the top-3 similar failure cards by incident type before the Writer even starts. If Redis is down, we fall back to in-memory. The system never crashes."
 
-**Q2: "What happens if Redis goes down?"**
+**Q2: "Does memory actually help?"**
 
-> Réponse orale : "Three-tier fallback. First, we try RediSearch with full vector KNN. If the FT module isn't available, we fall back to plain Redis with cosine similarity in JavaScript. If Redis is completely unreachable, we use in-memory storage. The harness never crashes — it just loses persistence between runs."
-
-**Q3: "Is the memory actually helping the score?"**
-
-> Réponse orale : "Honestly, on a small dataset the lift isn't always statistically significant — we report that transparently. But the mechanism is real: failure cards prevent repeated mistakes. The bigger win on small N is the within-session rewrite driven by the Verifier. Memory shines at scale when patterns accumulate."
+> Réponse orale : "On small data, the lift is modest — we report that honestly. The big proven win is within-session: the Verifier blocks and the Writer rewrites. Memory adds cross-session learning. At scale with more cases, it compounds."
 
 ---
 
-## Slide: Blind Revision Fails
+## Slide 7: CopilotKit — Audit Copilot
 
 ### Texte de la slide
 
-**Title:** "Why not just a better solo prompt?"
+**Title:** The owner's advisor before approving
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  SOLO AGENT                                         │
 │                                                     │
-│  Pass 1: Draft (curate + triage + reply + ticket)   │
-│  Pass 2: "Revise — be more helpful, warmer"         │
-│  Pass 3: "Revise — be more helpful, warmer"         │
-│  Pass 4: "Revise — be more helpful, warmer"         │
+│  BEFORE YOU CLICK "APPROVE":                        │
 │                                                     │
-│  4 LLM calls · 117K tokens · GRPR: 60%             │
-│  ❌ No feedback on WHAT went wrong                  │
-└─────────────────────────────────────────────────────┘
-
-                    vs.
-
-┌─────────────────────────────────────────────────────┐
-│  TEAM (Verifier)                                    │
+│  🤖 Audit Copilot:                                  │
+│  "Here's my check on this package:                  │
 │                                                     │
-│  Pass 1-3: Curator → Analyst → Writer (draft v1)    │
-│  Pass 4: Verifier → "BLOCKED. 20% exceeds 15% cap" │
-│         → Writer rewrites with targeted feedback    │
+│   ✓ 10€ credit — within the 15% policy cap          │
+│   ✓ 'missing items' — customer DID say that         │
+│   ✓ No forbidden gestures                           │
+│   ✓ Ticket complete: high · ops · re-send items     │
 │                                                     │
-│  4 LLM calls · 65K tokens · GRPR: 100%             │
-│  ✅ Knows exactly WHAT to fix                       │
+│   → Safe to approve."                               │
+│                                                     │
+│  ─────────────────────────────────────────────────  │
+│                                                     │
+│  Owner: "What if I offer a free meal instead?"      │
+│                                                     │
+│  🤖 "Free meal is outside your policy.              │
+│      Risk: ~15-20€ cost, no automated tracking.     │
+│      Alternative: max credit is 15% (≈ 10€).        │
+│      Your call — want me to flag it as manual       │
+│      override?"                                     │
+│                                                     │
+│  → AI advises. Human decides. Nothing auto-sends.   │
+│                                                     │
 └─────────────────────────────────────────────────────┘
 ```
-
-**Punchline en bas de slide:**
-> 3 blind revisions (117K tokens) < 1 targeted rewrite (65K tokens)
 
 ---
 
 ### Questions du jury que cette slide répond
 
-**Q1: "Why can't the solo agent just check the policy itself?"**
+**Q1: "How do you use CopilotKit?"**
 
-> Réponse orale : "It has access to the same policy tool. But having information and following it are two different things. The solo revises itself three times — it spends 2x the tokens — and still over-promises. Because its revision prompt says 'be warmer, be more helpful.' That actually pushes it to be MORE generous. It makes the problem worse. The Verifier gives targeted feedback: 'this number exceeds this limit.' One targeted rewrite fixes what three blind revisions can't."
+> Réponse orale : "CopilotKit is the human-in-the-loop advisor. Before the owner approves, the copilot audits the package — checks every claim against policy and evidence. If the owner wants to override, the copilot explains the consequences but respects the decision. It's an AI that audits another AI, for the human."
 
-**Q2: "Isn't this just a prompting problem? Couldn't you fix the solo with better instructions?"**
+**Q2: "Why not just buttons?"**
 
-> Réponse orale : "We tried the obvious thing. The solo gets four full LLM passes with all tools available. It still fails 40% of the time. The issue isn't the prompt — it's conflicting objectives in one context. The model is trained to be helpful AND must enforce constraints. When you separate those into two agents, each one does its job well. Same reason you don't let the developer approve their own PR."
+> Réponse orale : "Approve/Reject buttons are a rubber stamp. The owner doesn't know WHY it's safe. The copilot explains — 'this claim is grounded because this tool returned this value.' The human becomes an informed approver, not a blind one."
 
-**Q3: "Why does the team use fewer tokens if it has more agents?"**
+**Q3: "Can the copilot override the system?"**
 
-> Réponse orale : "Because blind revision is wasteful. The solo rewrites the entire response three times hoping to improve it. The team writes once, gets precise feedback, and fixes only what's broken. Targeted correction is cheaper than repeated guessing."
+> Réponse orale : "No. It only reads the recovery data. It cannot modify the pipeline, the score, or the output. It advises the owner, that's it. The proof engine stays untouched."
 
 ---
+
+## Slide 8: The Kill-Shot (Live Demo)
+
+### Texte de la slide
+
+**Title:** Prove it's the coordination
+
+```
+┌─────────────────────────────────────────────────────┐
+│                                                     │
+│  $ pnpm recovery                                    │
+│                                                     │
+│    solo         80%     225K tokens                  │
+│    team         90%     151K tokens                  │
+│    team+mem     80%      91K tokens                  │
+│                                                     │
+│  $ pnpm recovery --no-verifier                      │
+│                                                     │
+│    solo         80%                                  │
+│    team          ↓   ← collapses toward solo        │
+│    team+mem      ↓   ← collapses toward solo        │
+│                                                     │
+│  ─────────────────────────────────────────────────  │
+│                                                     │
+│  Same model ✓                                       │
+│  Same tools ✓                                       │
+│  Same budget ✓                                      │
+│  One flag changed: Verifier OFF                     │
+│                                                     │
+│  "If removing one agent collapses the score,        │
+│   that agent IS the value."                         │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+### Questions du jury que cette slide répond
+
+**Q1: "How do we know it's not just more compute?"**
+
+> Réponse orale : "Solo spends ~1.5x the tokens — 225K versus 151K — and scores worse. The team spends less and scores better. And when I disable just the Verifier — same model, same tools, same budget — the score collapses toward solo. It's the coordination. Not the compute."
+
+**Q2: "Is this reproducible?"**
+
+> Réponse orale : "Run it yourself. One command: pnpm recovery. One flag to kill it: --no-verifier. The metric is binary and mechanical. No LLM judge, no subjectivity. Same result every time."
+
+---
+
+## Ordre recommandé pour le pitch (3 min)
+
+| # | Slide | Durée | Ce que tu fais |
+|---|---|---|---|
+| 1 | Introduction | 20s | Context + "real restaurant" |
+| 2 | What It Does | 20s | Input → Output concret |
+| 3 | Solo vs Team | 30s | Le side-by-side : solo ungrounded vs team grounded |
+| 4 | Blind vs Targeted | 25s | Pourquoi solo fail malgré 3 revisions |
+| 5 | Kill-Shot (LIVE) | 25s | Terminal: --no-verifier collapse |
+| 6 | Weave | 15s | "Full traceability, 21 ops" |
+| 7 | Redis | 15s | "Learns from mistakes" |
+| 8 | CopilotKit | 15s | Live: "what if free meal?" |
+
+**Total: ~2min45.** Te laisse 15s de marge.
+
+Slides 5-6-7-8 sont rapides (sponsor tech), le coeur c'est slides 2-3-4 + kill-shot live.

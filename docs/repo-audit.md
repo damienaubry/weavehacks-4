@@ -107,8 +107,8 @@ and `pnpm grounding` (legacy) still run.
 | --- | --- |
 | `recovery-types.ts` | **live** — `IncidentType` (9 values), `RecoveryCase`, `CaseContext`. |
 | `recovery-cases.ts` | **live** — `RECOVERY_CASES` loaded from `data/recovery-cases.json` (override `RECOVERY_CASES_PATH`); tolerant per-case shape check; `INCIDENT_TYPES`; `checkCaseShape`/`extractRawCases`. |
-| `data/recovery-cases.json` | **live** — **48 cases: 30 real (verbatim Google reviews) + 18 synthetic**, covering all 9 incident types. `rc-real-088` is the sample drill-down (real 1★, solo 20% over-promise vs team 15%). |
-| `data/recovery-cases.fast.json` · `.demo.json` | **live** — held-out slices the demo points `RECOVERY_CASES_PATH` at: **fast = 8** (5 real / 3 synth, cheap iteration), **demo = 16** (9 real / 7 synth, the judged W&B run). Both include `rc-real-088`. |
+| `data/recovery-cases.json` | **live** — **48 cases: 30 real (verbatim Google reviews) + 18 synthetic**, covering all 9 incident types. `rc-real-025` is the sample drill-down (real review, missing half the order, solo ships an ungrounded claim vs team's grounded 10€ credit). |
+| `data/recovery-cases.fast.json` · `.demo.json` | **live** — held-out slices the demo points `RECOVERY_CASES_PATH` at: **fast = 8** (5 real / 3 synth, cheap iteration), **demo = 16** (9 real / 7 synth, the judged W&B run). Both include `rc-real-025`. |
 | `validate-cases.ts` | **live (WS-A)** — `pnpm --filter @weavehacks/seed validate-cases`: strict gate that resolves every gold tag against `truth` POLICY + reports the distribution. |
 | `pos.ts` (+ `data/pos.json`) | **live** — real 3-year Hiboutik POS contract + `loadServiceRecords`/`splitTrainHoldout`. |
 | `orders.ts` | **live (stale-ish)** — `ORDERS`, a hand-authored nightly slice powering the live `pnpm prep`. Parallels `pos.json`; migrate analytics tools to `pos.ts`, then retire. |
