@@ -139,11 +139,19 @@ interface GroundCtx {
   globalStrs: string[];
   itemNumbers: Map<string, number[]>;
   perItemSums: number[];
+  /** raw results keyed by tool name — for FIELD-AWARE checks (e.g. the 5★ review field specifically) */
+  resultsByTool: Map<string, unknown[]>;
 }
 
 const isPercentClaim = (t: string): boolean => /%|percent|change/i.test(t);
 const isTotalClaim = (t: string): boolean => /total|cover/i.test(t);
 const isRatioClaim = (t: string): boolean => /\d+(\.\d+)?\s*x\b|\btimes\b|\bfold\b|multiplier/i.test(t);
+// FIELD-AWARE predicates (catch misattribution / false context — still purely mechanical).
+const isReviewClaim = (t: string): boolean => /review|\bstars?\b|★|rating/i.test(t);
+const mentionsFiveStar = (t: string): boolean => /5\s*[★*]|5[-\s]?star|five[-\s]?star/i.test(t);
+const isComparative = (t: string): boolean => /\b(ahead|more|busier|up|over|than|vs|versus|compared|higher|increase|fewer|less|drop)\b/i.test(t);
+const mentionsNow = (t: string): boolean => /\b(tonight|today|so far|already|this evening|right now|now)\b/i.test(t);
+const isSoldNowClaim = (t: string): boolean => /\b(sold|selling|sales)\b/i.test(t) && mentionsNow(t);
 
 /** Is `stated` (a multiplier, e.g. 3 for "3x") the ratio between two of this item's own numbers? */
 function derivesRatio(stated: number, itemNums: number[]): boolean {
@@ -189,26 +197,55 @@ function verbatim(sv: number, c: Claim, ctx: GroundCtx): ClaimCheck | null {
   return null;
 }
 
+/**
+ * FIELD-AWARE review check: a "5★" claim must match a 5★-specific field (e.g. fiveStarKeywordPct),
+ * a general review claim the all-review fields. Stops "60% of 5★" grounding off the all-reviews 60%.
+ */
+function checkReview(sv: number, c: Claim, ctx: GroundCtx): ClaimCheck {
+  const rs = ctx.resultsByTool.get("review_stats") ?? [];
+  const t = c.claim.toLowerCase();
+  const valid = new Set<number>();
+  for (const r of rs) {
+    const o = (r ?? {}) as Record<string, unknown>;
+    const add = (...keys: string[]) => keys.forEach((k) => typeof o[k] === "number" && valid.add(o[k] as number));
+    if (mentionsFiveStar(t)) add("fiveStarKeywordPct", "fiveStarCount", "fiveStarKeywordMentions");
+    else if (/\b(avg|average|rating)\b/.test(t) && !/%|percent|mention/.test(t)) add("avgStars", "totalReviews");
+    else add("keywordPct", "keywordMentions", "totalReviews", "itemMentionPct", "itemMentions", "fiveStarCount");
+  }
+  const m = [...valid].find((v) => numClose(sv, v));
+  return m !== undefined ? { ...c, grounded: true, matchedTool: "(review field)", matchedValue: m } : { ...c, grounded: false };
+}
+
 function checkOne(c: Claim, ctx: GroundCtx): ClaimCheck {
   const sv = c.statedValue;
   if (typeof sv === "number" && Number.isFinite(sv)) {
-    // RATIO ("3x"): item-scoped derivation ONLY — a bare small int must not coincidentally verbatim-match.
-    if (isRatioClaim(c.claim)) {
-      const itemNums = itemNumbersForClaim(c.claim, ctx.itemNumbers);
-      return itemNums.length >= 2 && derivesRatio(sv, itemNums)
-        ? { ...c, grounded: true, matchedTool: "(derived ratio)" }
-        : { ...c, grounded: false };
+    const t = c.claim;
+    // REVIEW stat — field-aware: a 5★ stat must match a 5★ field, not any percentage.
+    if (isReviewClaim(t)) return checkReview(sv, c, ctx);
+    // "sold tonight / so far" on the FUTURE target date — nothing has sold yet, so it must be ~0.
+    if (isSoldNowClaim(t)) {
+      return Math.abs(sv) <= 1 ? { ...c, grounded: true, matchedTool: "(0 — future date)", matchedValue: 0 } : { ...c, grounded: false };
     }
-    // PERCENT: verbatim (a direct stat like a review %) OR item-scoped %-change derivation.
-    if (isPercentClaim(c.claim) && Math.abs(sv) <= 300) {
+    // RATIO ("3x") — item-scoped derivation only (a bare small int must not coincidentally verbatim-match).
+    if (isRatioClaim(t)) {
+      const itemNums = itemNumbersForClaim(t, ctx.itemNumbers);
+      return itemNums.length >= 2 && derivesRatio(sv, itemNums) ? { ...c, grounded: true, matchedTool: "(derived ratio)" } : { ...c, grounded: false };
+    }
+    // COMPARATIVE percent ("42% ahead of last match") — require item derivation, NOT a stray verbatim number.
+    if (isPercentClaim(t) && isComparative(t) && Math.abs(sv) <= 300) {
+      const itemNums = itemNumbersForClaim(t, ctx.itemNumbers);
+      return itemNums.length >= 2 && derivesPercent(sv, itemNums) ? { ...c, grounded: true, matchedTool: "(derived %)" } : { ...c, grounded: false };
+    }
+    // DIRECT percent (a stat that should appear verbatim in a field) OR item-scoped %-change derivation.
+    if (isPercentClaim(t) && Math.abs(sv) <= 300) {
       const v = verbatim(sv, c, ctx);
       if (v) return v;
-      const itemNums = itemNumbersForClaim(c.claim, ctx.itemNumbers);
+      const itemNums = itemNumbersForClaim(t, ctx.itemNumbers);
       if (itemNums.length >= 2 && derivesPercent(sv, itemNums)) return { ...c, grounded: true, matchedTool: "(derived %)" };
       return { ...c, grounded: false };
     }
     // TOTAL: verbatim OR matches a per-item sheet sum.
-    if (isTotalClaim(c.claim)) {
+    if (isTotalClaim(t)) {
       const v = verbatim(sv, c, ctx);
       if (v) return v;
       const m = ctx.perItemSums.find((s) => Math.abs(sv - s) <= Math.max(5, TOTAL_TOL_REL * s));
@@ -237,12 +274,14 @@ export function checkGrounding(claims: Claim[], toolCalls: ToolCallRecord[]): Gr
     globalStrs: [],
     itemNumbers: new Map(),
     perItemSums: [],
+    resultsByTool: new Map(),
   };
   for (const tc of toolCalls) {
     const nums: number[] = [];
     collectNumbers(tc.result, nums);
     ctx.globalNums.push(...nums);
     ctx.byTool.set(tc.name, [...(ctx.byTool.get(tc.name) ?? []), ...nums]);
+    ctx.resultsByTool.set(tc.name, [...(ctx.resultsByTool.get(tc.name) ?? []), tc.result]);
     collectStrings(tc.result, ctx.globalStrs);
     collectKeyedNumbers(tc.result, ctx.itemNumbers);
     collectPerItemSums(tc.result, ctx.perItemSums);
