@@ -55,3 +55,16 @@ export {
   type ProductPrediction,
   type BacktestMetrics,
 } from "./prep";
+
+// GROUNDING eval — the judged headline, measured mechanically (no LLM judge). Producer emits
+// structured claims; checkGrounding verifies each against captured tool results; the Critic is
+// the only difference between the solo and team runs.
+export {
+  checkGrounding,
+  runGroundingScenario,
+  type Claim,
+  type ClaimCheck,
+  type GroundingScore,
+  type GroundingRun,
+  type GroundingComparison,
+} from "./grounding";

@@ -11,6 +11,7 @@
     "prep": "tsx src/prep.ts",
     "baseline": "tsx src/baseline.ts",
     "forecast": "tsx src/forecast.ts",
+    "grounding": "tsx src/grounding.ts",
     "compare": "tsx src/compare.ts",
     "demo": "tsx src/demo.ts",
     "ask": "tsx src/ask.ts",
