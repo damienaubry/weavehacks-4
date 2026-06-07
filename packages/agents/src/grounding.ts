@@ -398,12 +398,19 @@ async function extractClaims(config: ProducerConfig, prose: string, model?: stri
   }
 }
 
-/** Producer = phase-1 tool-agent (writes the draft, grounds via tools) + phase-2 formatter (structures claims). */
-async function runProducer(config: ProducerConfig, input: string, model?: string): Promise<ProducerOutput> {
+export interface ProducerModels {
+  /** the agent under test — write the draft + call tools. May be a weak/cheap model. */
+  producer?: string;
+  /** measurement infra — structure prose into claims. Keep RELIABLE (default model). */
+  formatter?: string;
+}
+
+/** Producer = phase-1 tool-agent (the agent under test) + phase-2 formatter (reliable measurement). */
+async function runProducer(config: ProducerConfig, input: string, models: ProducerModels): Promise<ProducerOutput> {
   const res = await withRetry(() =>
-    runToolAgent({ name: config.id, role: config.role, instructions: config.instructions, input, tools: config.tools, model, maxSteps: 6, temperature: 0.1 }),
+    runToolAgent({ name: config.id, role: config.role, instructions: config.instructions, input, tools: config.tools, model: models.producer, maxSteps: 6, temperature: 0.1 }),
   );
-  const { claims, parseError, calls } = await extractClaims(config, res.text, model);
+  const { claims, parseError, calls } = await extractClaims(config, res.text, models.formatter);
   return { prose: res.text, claims, toolCalls: res.toolCalls, raw: res.text, parseError, usage: res.usage, producerCalls: res.llmCalls, formatterCalls: calls };
 }
 
@@ -492,12 +499,13 @@ function addBudget(b: Budget, o: ProducerOutput): void {
  */
 export async function runGroundingScenario(
   config: ProducerConfig,
-  opts: { model?: string; soloRetries?: number } = {},
+  opts: { producerModel?: string; formatterModel?: string; soloRetries?: number } = {},
 ): Promise<GroundingComparison> {
   const soloRetries = opts.soloRetries ?? 2;
-  const produce = traced(`agent.${config.id}.produce`, (input: string) => runProducer(config, input, opts.model));
-  const soloRetry = traced(`agent.${config.id}.solo_retry`, (input: string) => runProducer(config, input, opts.model));
-  const rewrite = traced(`agent.${config.id}.rewrite`, (input: string) => runProducer(config, input, opts.model));
+  const models: ProducerModels = { producer: opts.producerModel, formatter: opts.formatterModel };
+  const produce = traced(`agent.${config.id}.produce`, (input: string) => runProducer(config, input, models));
+  const soloRetry = traced(`agent.${config.id}.solo_retry`, (input: string) => runProducer(config, input, models));
+  const rewrite = traced(`agent.${config.id}.rewrite`, (input: string) => runProducer(config, input, models));
   const checkSolo = traced("grounding.check.solo", (claims: Claim[], calls: ToolCallRecord[]) => checkGrounding(claims, calls));
   const checkTeam = traced("grounding.check.team", (claims: Claim[], calls: ToolCallRecord[]) => checkGrounding(claims, calls));
 
