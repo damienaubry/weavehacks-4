@@ -42,12 +42,15 @@ export {
   ordersOn,
 } from "./tools";
 
-// PREP station: deterministic naive forecaster + backtest (the SOLO demand baseline).
+// PREP station: deterministic forecasters + backtest. naiveForecast = the SOLO demand baseline;
+// contextForecast = the TEAM lens that conditions on knowable signals (weather/holiday/football/…).
 export {
   naiveForecast,
+  contextForecast,
   backtest,
   type Forecaster,
   type ForecastQuery,
+  type ForecastConditions,
   type Forecast,
   type ProductPrediction,
   type BacktestMetrics,

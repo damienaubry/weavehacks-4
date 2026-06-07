@@ -9,7 +9,7 @@
  */
 
 import { loadServiceRecords, splitTrainHoldout } from "@weavehacks/seed";
-import { naiveForecast, backtest } from "@weavehacks/agents";
+import { naiveForecast, contextForecast, backtest } from "@weavehacks/agents";
 
 const [, , dayArg, serviceArg, productArg] = process.argv;
 
@@ -45,11 +45,26 @@ if (holdout.length === 0) {
   process.exit(0);
 }
 
-const m = backtest(train, holdout, naiveForecast, "naive-baseline (solo)");
-console.log("\n=== BACKTEST — solo baseline on the hidden future ===");
-console.log(`  forecaster:        ${m.forecaster}`);
-console.log(`  holdout services:  ${m.holdoutServices}`);
-console.log(`  product MAE:        ${m.productMAE}   (avg units off, per product per service)`);
-console.log(`  total-items MAE:    ${m.totalItemsMAE}   (avg units off on the full service total)`);
-console.log(`  total-items sMAPE:  ${m.totalItemsSMAPE}%   (scale-free service-total error)`);
-console.log(`\nThis is the SOLO number. The coordinated team must drive these DOWN.\n`);
+const solo = backtest(train, holdout, naiveForecast, "naive (solo)");
+const team = backtest(train, holdout, contextForecast, "contextual (team)");
+
+const dSmape = solo.totalItemsSMAPE - team.totalItemsSMAPE; // >0 = team better
+const dMae = Math.round((solo.totalItemsMAE - team.totalItemsMAE) * 10) / 10;
+const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+
+console.log("\n=== BACKTEST — solo vs team on the hidden future (same split, same scoring) ===");
+console.log(`  holdout services:  ${solo.holdoutServices}   (train ${solo.trainServices})`);
+console.log("");
+console.log("  forecaster              sMAPE      total-MAE     product-MAE");
+console.log(`  naive   (SOLO)          ${String(solo.totalItemsSMAPE).padStart(3)}%        ${String(solo.totalItemsMAE).padStart(5)}         ${solo.productMAE}`);
+console.log(`  context (TEAM)          ${String(team.totalItemsSMAPE).padStart(3)}%        ${String(team.totalItemsMAE).padStart(5)}         ${team.productMAE}`);
+console.log("");
+console.log(`  delta (solo − team):    sMAPE ${sign(dSmape)} pts    ·    total-MAE ${sign(dMae)}`);
+console.log(
+  dSmape > 0
+    ? `  → TEAM beats SOLO by ${dSmape} sMAPE pts.`
+    : dSmape === 0
+      ? `  → TIE on sMAPE (check total-MAE for sub-point movement).`
+      : `  → TEAM is WORSE than SOLO by ${-dSmape} sMAPE pts.`,
+);
+console.log("");

@@ -12,6 +12,21 @@
 import type { ServiceRecord } from "@weavehacks/seed";
 import { allProducts } from "@weavehacks/seed";
 
+/**
+ * Knowable-in-advance conditions for the TARGET service — weather forecast, school calendar,
+ * football fixtures, holiday / commercial-event flags. These are NOT the hidden sales; passing
+ * them is not leakage (a real forecaster knows tonight's weather and fixtures in advance).
+ * `contextForecast` conditions on them; `naiveForecast` ignores them.
+ */
+export interface ForecastConditions {
+  /** weather payload (condition, temp_moy_c, precipitation_mm, …) — same shape as ServiceRecord.weather */
+  weather?: Record<string, unknown> | null;
+  is_holiday?: boolean;
+  school_break?: boolean;
+  football_count?: number;
+  is_commercial_event?: boolean;
+}
+
 export interface ForecastQuery {
   /** lowercase weekday, e.g. "friday" */
   day: string;
@@ -19,6 +34,8 @@ export interface ForecastQuery {
   service: string;
   /** a single product to predict; omit to predict the whole prep sheet */
   product?: string;
+  /** knowable-in-advance signals for the target service (used by contextForecast, ignored by naive) */
+  conditions?: ForecastConditions;
 }
 
 export interface ProductPrediction {
@@ -72,6 +89,78 @@ export const naiveForecast: Forecaster = (train, query) => {
   return { query, predictions, why };
 };
 
+// ─── Contextual forecaster (the TEAM's demand lens) ──────────────────────────────────────
+
+/** Shrinkage smoothing constant: thin condition buckets fall back toward the naive mean. */
+const COND_SMOOTHING = 4;
+
+/**
+ * Compact, a-priori condition signature (thresholds chosen from the data, NOT swept to fit the
+ * holdout): rain (precip>0), cold (temp_moy<10°C), football (≥2 fixtures), school break, holiday,
+ * commercial event. Matching on this exact key keeps buckets interpretable; shrinkage handles
+ * sparsity.
+ */
+function conditionKey(c: ForecastConditions): string {
+  const w = c.weather ?? null;
+  const precip = w && typeof w.precipitation_mm === "number" ? w.precipitation_mm : 0;
+  const temp = w && typeof w.temp_moy_c === "number" ? w.temp_moy_c : null;
+  return (
+    (precip > 0 ? "R" : "-") +
+    (temp != null && temp < 10 ? "C" : "-") +
+    ((c.football_count ?? 0) >= 2 ? "F" : "-") +
+    (c.school_break ? "S" : "-") +
+    (c.is_holiday ? "H" : "-") +
+    (c.is_commercial_event ? "E" : "-")
+  );
+}
+
+/** Conditions extracted from a training record, for matching peers. */
+function recordConditions(r: ServiceRecord): ForecastConditions {
+  return {
+    weather: r.weather,
+    is_holiday: r.is_holiday,
+    school_break: r.school_break,
+    football_count: r.football_count,
+    is_commercial_event: r.is_commercial_event,
+  };
+}
+
+/**
+ * CONTEXTUAL forecaster. Same (day,service) backbone as naive, then SHRINKS each product's
+ * prediction toward the mean of peers that also match the target's conditions. Shrinkage weight
+ * α = nCond/(nCond + k), so a well-supported condition bucket pulls hard and a thin one falls back
+ * to the naive mean — no overfitting, no leakage (conditions are knowable in advance), applied
+ * UNIFORMLY to every holdout service (no per-date cherry-picking).
+ *
+ * Whether this BEATS naive on the hidden holdout is an empirical question — `backtest` answers it.
+ */
+export const contextForecast: Forecaster = (train, query) => {
+  const peers = comparable(train, query);
+  const basis = peers.length;
+  const key = query.conditions ? conditionKey(query.conditions) : null;
+  const condPeers = key ? peers.filter((r) => conditionKey(recordConditions(r)) === key) : [];
+  const nCond = condPeers.length;
+  const alpha = nCond / (nCond + COND_SMOOTHING); // 0 → pure naive; → 1 as conditioned peers grow
+
+  const products = query.product ? [query.product] : allProducts(peers);
+  const predictions: ProductPrediction[] = products
+    .map((product) => {
+      const naiveMean = basis ? peers.reduce((s, r) => s + (r.sales_by_product?.[product] ?? 0), 0) / basis : 0;
+      const condMean = nCond
+        ? condPeers.reduce((s, r) => s + (r.sales_by_product?.[product] ?? 0), 0) / nCond
+        : naiveMean;
+      return { product, predicted: round1(alpha * condMean + (1 - alpha) * naiveMean), basis: nCond || basis };
+    })
+    .sort((a, b) => b.predicted - a.predicted);
+
+  const why = basis
+    ? `(day,service) mean shrunk toward ${nCond} peer(s) matching conditions [${key}] (weight ${round1(alpha)}). ` +
+      `Signals: weather/holiday/school_break/football/commercial.`
+    : `No comparable ${query.day} ${query.service} services in training — predicting 0.`;
+
+  return { query, predictions, why };
+};
+
 // ─── Backtest: score a forecaster on the HIDDEN holdout ──────────────────────────────────
 
 export interface BacktestMetrics {
@@ -104,7 +193,19 @@ export function backtest(
   let smapeSum = 0;
 
   for (const actual of holdout) {
-    const f = forecaster(train, { day: actual.day, service: actual.service });
+    // Pass only KNOWABLE-in-advance conditions (weather/holiday/school_break/football/commercial).
+    // Never the hidden sales — naiveForecast ignores `conditions`, so its score is unchanged.
+    const f = forecaster(train, {
+      day: actual.day,
+      service: actual.service,
+      conditions: {
+        weather: actual.weather,
+        is_holiday: actual.is_holiday,
+        school_break: actual.school_break,
+        football_count: actual.football_count,
+        is_commercial_event: actual.is_commercial_event,
+      },
+    });
     const predByProduct = new Map(f.predictions.map((p) => [p.product, p.predicted]));
 
     // union of predicted + actually-sold products for this service
