@@ -183,10 +183,12 @@ export function RecoveryLeaderboard({
           </p>
         ) : (
           <p style={{ color: "var(--muted)", fontSize: 12, margin: "12px 0 0", lineHeight: 1.5 }}>
-            <strong style={{ color: "var(--text)" }}>Honest note:</strong> on this small held-out slice, team+memory
-            didn&apos;t beat team ({mem.teamToMemory} pts) — across-run memory is{" "}
-            <strong>neutral here</strong>. The self-improvement you can watch live is the Verifier driving the
-            Writer&apos;s <strong>v1→v2 rewrite</strong> within a session.
+            <strong style={{ color: "var(--text)" }}>Honest note:</strong> on this held-out slice, team+memory
+            ({mem.teamToMemory} pts){" "}
+            <strong>{mem.memoryHelps === "down" ? "did not help this run" : "was neutral here"}</strong> — across-run
+            failure-card memory was {mem.memoryHelps === "down" ? "negative" : "neutral"} on this small N. The
+            self-improvement that holds is the Verifier driving the Writer&apos;s <strong>v1→v2 rewrite</strong>{" "}
+            within a session.
           </p>
         ))}
 

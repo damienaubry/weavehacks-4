@@ -158,7 +158,9 @@ export default function RecoveryPage() {
                 .{" "}
                 {mem.memoryHelps === "up"
                   ? `Across-run memory adds another +${mem.teamToMemory} pts.`
-                  : "The self-improvement you can watch live is the Verifier driving the Writer’s v1→v2 rewrite; across-run memory is neutral on this small slice."}{" "}
+                  : mem.memoryHelps === "down"
+                    ? `Across-run memory did not help this run (${mem.teamToMemory} pts on the held-out slice) — the self-improvement that holds is the Verifier driving the Writer’s v1→v2 rewrite.`
+                    : "The self-improvement you can watch live is the Verifier driving the Writer’s v1→v2 rewrite; across-run memory is neutral on this slice."}{" "}
                 Every claim is traced to the query that proves it in Weave.
               </p>
               {banner && (

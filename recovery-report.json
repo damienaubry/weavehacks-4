@@ -1,42 +1,42 @@
 {
   "dataset": {
-    "n": 8,
-    "realCount": 5,
-    "syntheticCount": 3
+    "n": 16,
+    "realCount": 9,
+    "syntheticCount": 7
   },
   "rows": [
     {
       "variant": "solo",
-      "grpr": 0.6,
-      "budgetTokens": 117830,
-      "budgetCalls": 65
+      "grpr": 0.8,
+      "budgetTokens": 224794,
+      "budgetCalls": 129
     },
     {
       "variant": "team",
-      "grpr": 1,
-      "budgetTokens": 65197,
-      "budgetCalls": 45
+      "grpr": 0.9,
+      "budgetTokens": 150975,
+      "budgetCalls": 100
     },
     {
       "variant": "team+memory",
       "grpr": 0.8,
-      "budgetTokens": 55164,
-      "budgetCalls": 34
+      "budgetTokens": 90804,
+      "budgetCalls": 61
     }
   ],
   "sampleCase": {
-    "id": "rc-real-088",
-    "review": "Very average and tasteless… -1I do not recommend !",
-    "incidentTypeGold": "food_quality",
+    "id": "rc-real-025",
+    "review": "Inadmissible, nous venons de commander et il manque la moitié de la commandeCe n’est pas normal",
+    "incidentTypeGold": "wrong_or_missing_item",
     "solo": {
-      "reply": "Dear valued customer, we are truly sorry to hear that your recent experience with our food did not meet your expectations. Your feedback is incredibly important to us, and we strive to provide delicious meals that leave a lasting impression. We would love the chance to make it right! If you haven't tried our Tonkotsu Ramen yet, it features a rich, 18-hour broth that many of our customers rave about. As a gesture of goodwill, we would like to offer you a 20% discount on your next order. We genuinely appreciate your feedback and hope to serve you a much better meal in the future. Thank you for giving us the opportunity to improve!",
+      "reply": "Bonjour, je suis vraiment désolé d'apprendre que votre commande était incomplète. C'est inacceptable et je comprends parfaitement votre frustration. Nous nous efforçons de fournir un service de qualité, et il est clair que nous avons échoué cette fois-ci. Pour rectifier cela, je vous propose un crédit de 15% sur votre prochaine commande, jusqu'à un maximum de 10 euros, afin de vous donner une chance de mieux nous connaître. Votre satisfaction est très importante pour nous, et nous espérons que vous nous donnerez une autre occasion de vous impressionner. Si vous avez d'autres préoccupations ou si vous souhaitez discuter de votre expérience, n'hésitez pas à nous contacter directement. Merci de votre compréhension et de votre patience !",
       "pass": false,
       "failReasons": [
-        "politique : gesture 20% exceeds the 15% credit limit [over_promise]"
+        "claim non sourcée : « missing items in the order » (1)"
       ]
     },
     "team": {
-      "reply": "Dear valued customer, \n\nThank you for taking the time to share your feedback with us. We are genuinely sorry to hear that your experience did not meet your expectations. At Le Kyoto, we strive to provide delicious and memorable meals, and it seems we fell short this time.\n\nWe would love the opportunity to make it right for you. As a gesture of goodwill, we would like to offer you a 15% credit on your next order. We hope this will encourage you to give us another chance to impress you with our flavors.\n\nPlease reach out to us directly if you have any further concerns or suggestions. We appreciate your support and hope to serve you again soon! \n\nWarm regards, \nThe Le Kyoto Team",
+      "reply": "Bonjour, \n\nNous sommes vraiment désolés d'apprendre que votre commande était incomplète. Ce n'est pas l'expérience que nous souhaitons offrir à nos clients. Nous comprenons à quel point cela peut être frustrant et nous vous remercions de nous en avoir informés.\n\nPour compenser cette situation, nous aimerions vous offrir un crédit de 10€ sur votre prochaine commande. Nous espérons que cela vous encouragera à nous donner une autre chance de vous servir comme il se doit.\n\nMerci encore pour votre compréhension, et nous espérons vous revoir bientôt !\n\nCordialement, \nL'équipe de Le Kyoto",
       "pass": true
     }
   }

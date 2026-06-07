@@ -1,0 +1,43 @@
+{
+  "dataset": {
+    "n": 16,
+    "realCount": 9,
+    "syntheticCount": 7
+  },
+  "rows": [
+    {
+      "variant": "solo",
+      "grpr": 0.8,
+      "budgetTokens": 553595,
+      "budgetCalls": 164
+    },
+    {
+      "variant": "team",
+      "grpr": 0.6,
+      "budgetTokens": 475467,
+      "budgetCalls": 145
+    },
+    {
+      "variant": "team+memory",
+      "grpr": 0.8,
+      "budgetTokens": 254641,
+      "budgetCalls": 83
+    }
+  ],
+  "sampleCase": {
+    "id": "rc-real-025",
+    "review": "Inadmissible, nous venons de commander et il manque la moitié de la commandeCe n’est pas normal",
+    "incidentTypeGold": "wrong_or_missing_item",
+    "solo": {
+      "reply": "Bonjour,\n\nVous avez tout à fait raison d'être en colère — quand la moitié de votre commande n'arrive pas, c'est votre soirée qui est gâchée, et ce n'est pas acceptable de notre part. Nous sommes sincèrement désolés.\n\nVoici ce que nous faisons, concrètement, dès maintenant :\n\n🔹 Nous vous contactons en privé sous 4 h pour identifier exactement les plats manquants et vous les faire parvenir ou vous les recréditer.\n🔹 En attendant, nous avons mis en place une vérification plat par plat à la sortie de cuisine — chaque commande est désormais cochée et signée avant d'être confiée au livreur. Plus d'oubli possible.\n\nEn geste de bonne volonté, nous vous proposons un avoir de 15 % sur votre prochaine commande (plafonné à 10 €). Il suffit de nous écrire en mentionnant votre numéro de commande — nous veillerons à ce que tout arrive, sans exception.\n\nNous espérons sincèrement vous donner une deuxième chance et vous offrir l'expérience que Le Kyoto doit à chacun de ses convives.\n\nBien à vous,\nL'équipe Le Kyoto",
+      "pass": false,
+      "failReasons": [
+        "claim non sourcée : « Customer reported half the order was missing » (\"missing_half_order\")"
+      ]
+    },
+    "team": {
+      "reply": "Bonjour,\n\nNous sommes sincèrement désolés d'apprendre que la moitié de votre commande était manquante — ce n'est effectivement pas acceptable et nous comprenons tout à fait votre frustration.\n\nNous prenons ce type d'incident très au sérieux. Nous allons remonter ce problème à notre équipe de préparation ainsi qu'à notre partenaire de livraison afin d'identifier ce qui s'est passé et d'éviter que cela ne se reproduise.\n\nEn geste commercial, nous vous offrons un avoir sur votre prochaine commande, conformément à notre politique. N'hésitez pas à nous contacter directement (avec les détails de votre commande si possible) pour que nous puissions activer cet avoir.\n\nNous espérons avoir le plaisir de vous accueillir à nouveau et de vous montrer le vrai niveau de service que nous visons.\n\n— L'équipe Le Kyoto",
+      "pass": false
+    }
+  }
+}
