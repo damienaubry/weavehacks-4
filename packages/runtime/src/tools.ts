@@ -63,6 +63,35 @@ export interface ToolAgentResult {
   usage: TokenUsage;
 }
 
+/**
+ * Retry a chat-completion on transient failures — 429 rate limits (honoring `retry-after[-ms]`) and
+ * 5xx / dropped connections — with exponential backoff + jitter. WHY: a single 429 must not kill a
+ * whole GRPR run; the eval fans out many concurrent calls and providers cap tokens-per-minute.
+ */
+async function withRateLimitRetry<T>(fn: () => Promise<T>, attempts = 7): Promise<T> {
+  let delay = 800;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e: unknown) {
+      const err = e as { status?: number; code?: string; headers?: unknown };
+      const status = typeof err?.status === "number" ? err.status : 0;
+      const retryable = status === 429 || status >= 500 || err?.code === "ECONNRESET" || err?.code === "ETIMEDOUT";
+      if (!retryable || i === attempts - 1) throw e;
+      const h = err.headers as { get?: (k: string) => string | null } | Record<string, string> | undefined;
+      const hdr = (k: string): number => {
+        const v = h && typeof (h as { get?: unknown }).get === "function" ? (h as { get: (k: string) => string | null }).get(k) : (h as Record<string, string> | undefined)?.[k];
+        const n = Number(v);
+        return Number.isFinite(n) && n > 0 ? n : 0;
+      };
+      const waitMs = hdr("retry-after-ms") || hdr("retry-after") * 1000 || delay;
+      await new Promise((r) => setTimeout(r, waitMs + Math.random() * 300));
+      delay = Math.min(delay * 2, 15000);
+    }
+  }
+  throw new Error("withRateLimitRetry: attempts exhausted");
+}
+
 export async function runToolAgent(opts: ToolAgentOptions): Promise<ToolAgentResult> {
   const provider = opts.provider ?? (opts.role ? providerForRole(opts.role) : defaultProvider());
   const cfg = getProviders()[provider];
@@ -92,13 +121,15 @@ export async function runToolAgent(opts: ToolAgentOptions): Promise<ToolAgentRes
   };
 
   for (let step = 0; step < maxSteps; step++) {
-    const res = await client.chat.completions.create({
-      model,
-      temperature: opts.temperature ?? 0.2,
-      messages,
-      tools: toolDefs.length ? toolDefs : undefined,
-      tool_choice: toolDefs.length ? "auto" : undefined,
-    });
+    const res = await withRateLimitRetry(() =>
+      client.chat.completions.create({
+        model,
+        temperature: opts.temperature ?? 0.2,
+        messages,
+        tools: toolDefs.length ? toolDefs : undefined,
+        tool_choice: toolDefs.length ? "auto" : undefined,
+      }),
+    );
     addUsage(res.usage);
     const msg = res.choices[0]?.message;
     if (!msg) break;
