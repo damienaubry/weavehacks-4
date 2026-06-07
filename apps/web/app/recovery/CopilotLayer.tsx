@@ -25,8 +25,41 @@ export interface CopilotLayerProps {
   hitl: HitlState;
   decide: (target: HitlTarget, decision: HitlDecision) => void;
   replay: () => void;
+  /** /recovery's Audit Copilot toggle (default ON). false unmounts the chat sidebar entirely. */
+  auditMode: boolean;
   children: ReactNode;
 }
+
+/**
+ * Audit Copilot system prompt — the owner's ADVISOR, not a gatekeeper. It proactively audits the
+ * recovery package (gesture vs policy, claim grounding, forbidden gestures, ticket completeness) and
+ * reasons about "what if I do X instead?" WITHOUT ever blocking — the owner has final authority. The
+ * policy numbers here mirror packages/truth POLICY.gesture (15% / 10€ / forbidden gestures). Front-end
+ * only; this prompt never touches the judged GRPR number.
+ */
+const AUDIT_COPILOT_INSTRUCTIONS = `You are the Audit Copilot for Le Kyoto, a Japanese restaurant near Paris.
+
+ROLE: You are the restaurant owner's trusted advisor. You help them understand the recovery package BEFORE they approve it. You are NOT a gatekeeper — the owner has final authority. Your job is to inform, not to block.
+
+WHEN RECOVERY DATA IS AVAILABLE, proactively audit the package:
+1. Check the reply's gesture (credit %) against policy (max 15% or 10€ max)
+2. Verify each claim in the reply is backed by evidence from the report
+3. Confirm no forbidden gestures (free meals, full refunds, cash refunds, unlimited free delivery)
+4. Verify the internal ticket is complete (severity + owner + action)
+
+Present your audit as a short checklist with ✓ or ⚠️ for each point.
+
+WHEN THE OWNER ASKS "what if I do X instead?":
+- Explain the consequences (cost, policy compliance, grounding status)
+- If it's outside policy: explain WHY it's outside, what the cost/risk is, and offer the closest policy-compliant alternative
+- NEVER say "I can't let you do that" or "I can't approve that" — the owner is your boss
+- Instead say: "That's outside the automated policy, here's what it means: [consequences]. Your call — want me to flag it as a manual override?"
+
+TONE: Direct, concise, data-driven. Reference specific numbers from the policy and evidence. No fluff, no corporate speak. You're a smart colleague, not a customer service bot.
+
+LANGUAGE: Respond in the same language the owner uses (English or French).
+
+IMPORTANT: You only reference data from the recovery report exposed to you. Never invent facts, prices, or policy rules.`;
 
 export function CopilotLayer(props: CopilotLayerProps) {
   return (
@@ -36,26 +69,43 @@ export function CopilotLayer(props: CopilotLayerProps) {
     // we hide its light-DOM HOST element), hence GLOBAL selectors. Keeps the demo clean on a projector;
     // the chat sidebar (copilotKitButton / CopilotSidebar) is a different element and stays.
     <CopilotKit runtimeUrl="/api/copilotkit" showDevConsole={false}>
-      <style>{`.copilotKitDevConsole,cpk-web-inspector{display:none !important;}`}</style>
+      <style>{`
+        .copilotKitDevConsole, cpk-web-inspector { display: none !important; }
+
+        /* Theme the CopilotKit chat to the /recovery dashboard palette: remap CopilotKit's own
+           variables onto the dashboard's THEME-AWARE tokens (var(--panel)/--accent/…) so the chat
+           tracks the dark/light toggle automatically — no duplicated light/dark blocks. Declared on
+           the CopilotKit root containers, so they win over the library's :root defaults by
+           inheritance proximity (not selector specificity / source order). */
+        .copilotKitButton, .copilotKitSidebar, .copilotKitPopup, .copilotKitWindow {
+          --copilot-kit-primary-color: var(--accent);
+          --copilot-kit-contrast-color: var(--accent-fg);
+          --copilot-kit-background-color: var(--panel);
+          --copilot-kit-secondary-color: var(--chip);
+          --copilot-kit-secondary-contrast-color: var(--text);
+          --copilot-kit-separator-color: var(--border);
+          --copilot-kit-muted-color: var(--muted);
+          --copilot-kit-input-background-color: var(--chip);
+          --copilot-kit-error-text: var(--danger);
+        }
+      `}</style>
       <CopilotBridge {...props} />
       {props.children}
-      <CopilotSidebar
-        defaultOpen={false}
-        clickOutsideToClose
-        instructions={
-          "You are the Grounded Recovery Copilot for Le Kyoto, a small Japanese takeout near Paris. " +
-          "Answer ONLY from the provided recovery state (the GRPR scoreboard and the sample case). " +
-          "The headline metric is GRPR — Grounded Recovery Pass Rate — solo < team < team+memory at matched compute. " +
-          "When the user wants to see the pipeline, call the replayBrigade action. When they want to publish the " +
-          "recovery package, call approveRecoveryPackage so a human can approve or reject. Never invent restaurant " +
-          "facts; nothing publishes without human approval."
-        }
-        labels={{
-          title: "Recovery Copilot",
-          initial:
-            "I turn one review into a grounded recovery package. Try: “explain the GRPR gap”, “run the brigade”, or “approve the package”.",
-        }}
-      />
+      {/* Audit Copilot — gated behind the /recovery toggle (default ON). OFF unmounts the whole
+          sidebar (button + panel) so the page is a clean fallback if the copilot misbehaves on stage.
+          CopilotBridge's readable state + actions stay registered regardless; only the chat UI toggles. */}
+      {props.auditMode && (
+        <CopilotSidebar
+          defaultOpen={false}
+          clickOutsideToClose
+          instructions={AUDIT_COPILOT_INSTRUCTIONS}
+          labels={{
+            title: "Audit Copilot",
+            initial:
+              "I audit the recovery package before you approve it. Try: “audit this package”, “what if I offer a free meal?”, or “run the brigade”.",
+          }}
+        />
+      )}
     </CopilotKit>
   );
 }

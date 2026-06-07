@@ -313,9 +313,223 @@ code {
   height: 1px;
   background: var(--border);
 }
-/* offset anchored scroll so a section clears the sticky topbar + stepper */
-.recovery-section {
-  scroll-margin-top: 124px;
+/* ── /recovery horizontal slide deck ───────────────────────────────────────────
+   A pinned 100dvh frame holds a flex column (topbar / stepper / progress / deck); the
+   deck clips a flex "rail" of 4 always-mounted slides translated by -activeIndex*100%.
+   Tokens only — dark + light both work. */
+.recovery-app {
+  display: flex;
+  height: 100vh; /* fallback first */
+  height: 100dvh; /* preferred — absorbs the mobile URL bar */
+  overflow: hidden; /* the frame itself never scrolls */
+}
+.recovery-body {
+  /* reuses .owner-body (flex:1; min-width:0; column) */
+  height: 100%;
+  min-height: 0; /* let the deck shrink instead of pushing the column taller */
+  overflow: hidden;
+}
+/* lock document scroll while the deck route is mounted (class toggled in page.tsx) */
+html.recovery-noscroll,
+html.recovery-noscroll body {
+  overflow: hidden;
+  height: 100%;
+}
+/* topbar + stepper must not shrink (nothing scrolls under them anymore) */
+.recovery-body .owner-topbar,
+.recovery-body .recovery-tabs {
+  flex: 0 0 auto;
+}
+
+/* slim progress fill under the stepper */
+.deck-progress {
+  flex: 0 0 auto;
+  height: 2px;
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  overflow: hidden;
+}
+.deck-progress-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 65%, transparent), var(--accent));
+  border-radius: 999px;
+  transition: width 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* deck viewport: eats the remaining height, clips the rail horizontally, hosts the chevrons */
+.deck-viewport {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: pan-y; /* vertical scroll inside a slide is native; we own horizontal swipe in JS */
+}
+
+/* the rail: a flex row of full-width slides, translated by -index*100% (set inline) */
+.deck-rail {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  will-change: transform;
+  transition: transform 0.42s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* each slide = one viewport width; owns its own vertical overflow (only the active one is on-screen) */
+.deck-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow-y: auto; /* ONLY this slide scrolls, if its content is taller than the deck */
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start; /* centering is done by margin:auto on the inner — no 'safe' keyword */
+  scrollbar-width: thin;
+}
+.deck-slide::-webkit-scrollbar {
+  width: 8px;
+}
+.deck-slide::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted) 30%, transparent);
+  border-radius: 999px;
+}
+
+/* centered, width-capped content column. margin:auto => vertically centered when it fits,
+   top-aligned (top reachable, scrolls) when it overflows. Fixes the old left-pinned look. */
+.deck-slide-inner {
+  width: 100%;
+  max-width: 920px;
+  margin: auto;
+  padding: 24px 28px; /* becomes the top/bottom gutter when the slide scrolls */
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.deck-slide-inner--wide {
+  max-width: 1040px;
+}
+
+/* compact hero (slide 1 only) — replaces the old 32px h1 + long paragraph */
+.deck-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.deck-hero-title {
+  font-size: 22px;
+  line-height: 1.12;
+  margin: 4px 0 0;
+}
+.deck-hero-sub {
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 780px;
+}
+.deck-hero-sub strong {
+  color: var(--text);
+}
+.deck-hero-banner {
+  font-size: 12.5px;
+  margin: 2px 0 0;
+}
+.deck-footer {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin-top: 2px;
+}
+
+/* edge chevrons */
+.deck-chevron {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  line-height: 1;
+  padding-bottom: 3px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, opacity 0.2s ease;
+}
+.deck-chevron:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.deck-chevron-prev {
+  left: 14px;
+}
+.deck-chevron-next {
+  right: 14px;
+}
+.deck-chevron:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+.deck-chevron:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: 2px;
+}
+
+/* reduced motion: instant cuts, no horizontal sweep / progress animation */
+@media (prefers-reduced-motion: reduce) {
+  .deck-rail {
+    transition: none;
+  }
+  .deck-progress-fill {
+    transition: none;
+  }
+}
+
+/* narrow screens: tighten padding, drop chevrons (stepper + swipe still navigate) */
+@media (max-width: 860px) {
+  .deck-slide-inner,
+  .deck-slide-inner--wide {
+    padding: 16px 16px;
+    gap: 14px;
+    max-width: 100%;
+  }
+  .deck-chevron {
+    display: none;
+  }
+}
+
+/* short viewports: reclaim height so slide 1 + theater fit without internal scroll */
+@media (max-height: 760px) {
+  .deck-slide-inner {
+    padding-top: 16px;
+    padding-bottom: 16px;
+    gap: 12px;
+  }
+  .deck-hero-title {
+    font-size: 20px;
+  }
+  .deck-hero-sub {
+    font-size: 13px;
+  }
+}
+@media (max-height: 680px) {
+  .deck-hero {
+    gap: 5px;
+  }
+  .deck-hero-sub {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 }
 
 .owner-body {

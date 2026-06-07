@@ -12,7 +12,7 @@
  * The CopilotKit layer (live chat, readable state, the HITL action) wraps this in `./CopilotLayer`
  * — front-end only, and the page renders fully even if that layer or its runtime is unavailable.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchRecovery,
   ticketFor,
@@ -43,6 +43,10 @@ export default function RecoveryPage() {
   const [mocked, setMocked] = useState(false);
   const [active, setActive] = useState<RecoverySection>("leaderboard");
 
+  // Audit Copilot toggle — local-only, default ON. OFF unmounts the CopilotKit sidebar entirely
+  // (a pre-submission safety switch: kill the copilot from the UI without touching code).
+  const [auditMode, setAuditMode] = useState(true);
+
   // theater replay signal + current stage (also surfaced to the copilot)
   const [runNonce, setRunNonce] = useState(0);
   const [stage, setStage] = useState<RecoveryStage | null>(null);
@@ -53,23 +57,15 @@ export default function RecoveryPage() {
     setHitl((p) => ({ ...p, [target]: decision }));
   }, []);
 
-  const sections = {
-    leaderboard: useRef<HTMLDivElement>(null),
-    theater: useRef<HTMLDivElement>(null),
-    drilldown: useRef<HTMLDivElement>(null),
-    approvals: useRef<HTMLDivElement>(null),
-  } as const;
-
-  // pause the scroll-spy while a click-driven smooth scroll is in flight, so the active step
-  // doesn't flicker through the sections it passes over on the way to the target.
-  const spyPaused = useRef(false);
-  const goto = useCallback((id: RecoverySection) => {
-    setActive(id);
-    spyPaused.current = true;
-    sections[id].current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    window.setTimeout(() => {
-      spyPaused.current = false;
-    }, 700);
+  // Deck model: `active` (the RecoverySection state above) is the single source of truth. The rail is
+  // translated by -activeIndex*100%, so the highlighted step and the visible slide can never desync —
+  // no scroll-spy / refs / IntersectionObserver needed.
+  const ORDER = ["leaderboard", "theater", "drilldown", "approvals"] as const;
+  const activeIndex = ORDER.indexOf(active);
+  const goto = useCallback((id: RecoverySection) => setActive(id), []);
+  const gotoIndex = useCallback((i: number) => {
+    const c = Math.max(0, Math.min(ORDER.length - 1, i));
+    setActive(ORDER[c]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -80,27 +76,74 @@ export default function RecoveryPage() {
     });
   }, []);
 
-  // scroll-spy: highlight the step for the section currently in view (skipped during click nav).
+  // Pin the document while the deck is mounted — the fixed-height shell owns the viewport, so the
+  // page itself must never scroll (this is what makes navigation horizontal, not vertical).
   useEffect(() => {
-    if (!report) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (spyPaused.current) return;
-        const top = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        const id = top?.target.getAttribute("data-section") as RecoverySection | null;
-        if (id) setActive(id);
-      },
-      { rootMargin: "-116px 0px -55% 0px" },
-    );
-    (Object.keys(sections) as RecoverySection[]).forEach((k) => {
-      const el = sections[k].current;
-      if (el) observer.observe(el);
-    });
-    return () => observer.disconnect();
+    document.documentElement.classList.add("recovery-noscroll");
+    return () => document.documentElement.classList.remove("recovery-noscroll");
+  }, []);
+
+  // Keyboard: ←/→ + Home/End move slides; never hijack the copilot chat input or any text field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Home" && e.key !== "End") return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable ||
+          t.closest("input, textarea, [contenteditable=true], .copilotKitSidebar, .copilotKitWindow, [data-copilotkit]"))
+      )
+        return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        gotoIndex(activeIndex + 1);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        gotoIndex(activeIndex - 1);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        gotoIndex(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        gotoIndex(ORDER.length - 1);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [report]);
+  }, [activeIndex, gotoIndex]);
+
+  // Pointer swipe on the deck — horizontal-dominant gestures only (dx > dy*1.3), so a vertical scroll
+  // inside a tall slide never flips the slide; swipes starting on a control are ignored.
+  const swipeX = useRef<number | null>(null);
+  const swipeY = useRef(0);
+  const onPointerDown = useCallback((e: ReactPointerEvent) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const t = e.target as HTMLElement | null;
+    if (t && t.closest("button, a, input, textarea, [contenteditable=true]")) {
+      swipeX.current = null;
+      return;
+    }
+    swipeX.current = e.clientX;
+    swipeY.current = e.clientY;
+  }, []);
+  const onPointerUp = useCallback(
+    (e: ReactPointerEvent) => {
+      if (swipeX.current === null) return;
+      const dx = e.clientX - swipeX.current;
+      const dy = e.clientY - swipeY.current;
+      swipeX.current = null;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+        gotoIndex(activeIndex + (dx < 0 ? 1 : -1));
+      }
+    },
+    [activeIndex, gotoIndex],
+  );
+  const onPointerCancel = useCallback(() => {
+    swipeX.current = null;
+  }, []);
 
   const ticket = useMemo(
     () => (report ? ticketFor(report.sampleCase.incidentTypeGold) : null),
@@ -133,9 +176,9 @@ export default function RecoveryPage() {
   const teamRow = report.rows.find((r) => r.variant === "team");
 
   return (
-    <CopilotLayer report={report} stage={stage} hitl={hitl} decide={decide} replay={replay}>
-      <div className="owner-shell">
-        <div className="owner-body">
+    <CopilotLayer report={report} stage={stage} hitl={hitl} decide={decide} replay={replay} auditMode={auditMode}>
+      <div className="recovery-app">
+        <div className="owner-body recovery-body">
           {/* top bar */}
           <div className="owner-topbar">
             <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
@@ -161,70 +204,203 @@ export default function RecoveryPage() {
                 <span style={{ width: 7, height: 7, borderRadius: 999, background: mocked ? "var(--warn)" : "var(--accent)" }} />
                 {mocked ? "staged" : "live"} · /recovery
               </span>
+              <AuditToggle on={auditMode} onToggle={() => setAuditMode((v) => !v)} />
               <ThemeToggle />
             </div>
           </div>
 
-          {/* horizontal stepper — the four demo sections, sticky under the top bar */}
+          {/* horizontal stepper — primary nav; clicking a step flips the deck slide */}
           <RecoveryTabs active={active} approvals={pendingApprovals} onNavigate={goto} />
 
-          <div className="owner-content" style={{ display: "flex", flexDirection: "column", gap: 22, maxWidth: 1040 }}>
-            {/* hero */}
-            <div>
-              <span className="grounded-pill">
-                <Dot /> Derived from Le Kyoto&apos;s real Google reviews
-              </span>
-              <h1 style={{ fontSize: 32, margin: "16px 0 8px", lineHeight: 1.08 }}>
-                One review → a grounded recovery package
-              </h1>
-              <p style={{ color: "var(--muted)", fontSize: 15, maxWidth: 760, margin: 0, lineHeight: 1.55 }}>
-                On {report.dataset.n} held-out cases — with the solo given ≥ the team&apos;s compute — the multi-agent
-                team lifts <strong style={{ color: "var(--text)" }}>GRPR</strong>
-                {soloRow && teamRow ? (
-                  <>
-                    {" "}from <strong style={{ color: "var(--text)" }}>{pct(soloRow.grpr)}</strong> to{" "}
-                    <strong style={{ color: "var(--text)" }}>{pct(teamRow.grpr)}</strong>
-                    {mem.soloToTeam !== null ? ` (+${mem.soloToTeam} pts)` : ""}
-                  </>
-                ) : null}
-                .{" "}
-                {mem.memoryHelps === "up"
-                  ? `Across-run memory adds another +${mem.teamToMemory} pts.`
-                  : mem.memoryHelps === "down"
-                    ? `Across-run memory did not help this run (${mem.teamToMemory} pts on the held-out slice) — the self-improvement that holds is the Verifier driving the Writer’s v1→v2 rewrite.`
-                    : "The self-improvement you can watch live is the Verifier driving the Writer’s v1→v2 rewrite; across-run memory is neutral on this slice."}{" "}
-                Every claim is traced to the query that proves it in Weave.
-              </p>
-              {banner && (
-                <p style={{ color: banner.tone, fontSize: 12.5, marginTop: 12 }}>{banner.text}</p>
-              )}
-            </div>
+          {/* slim progress fill under the stepper */}
+          <div className="deck-progress" aria-hidden="true">
+            <span className="deck-progress-fill" style={{ width: `${((activeIndex + 1) / ORDER.length) * 100}%` }} />
+          </div>
 
-            <div ref={sections.leaderboard} data-section="leaderboard" className="recovery-section">
-              <RecoveryLeaderboard rows={report.rows} dataset={report.dataset} />
-            </div>
+          {/* deck viewport — fills the remaining height, clips the horizontal rail */}
+          <div
+            className="deck-viewport"
+            role="region"
+            aria-roledescription="carousel"
+            aria-label="Recovery demo slides"
+            onPointerDown={onPointerDown}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerCancel}
+          >
+            <button
+              type="button"
+              className="deck-chevron deck-chevron-prev"
+              onClick={() => gotoIndex(activeIndex - 1)}
+              disabled={activeIndex === 0}
+              aria-label="Previous slide"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="deck-chevron deck-chevron-next"
+              onClick={() => gotoIndex(activeIndex + 1)}
+              disabled={activeIndex === ORDER.length - 1}
+              aria-label="Next slide"
+            >
+              ›
+            </button>
 
-            <div ref={sections.theater} data-section="theater" className="recovery-section">
-              <AgentTheater sampleCase={report.sampleCase} runNonce={runNonce} onStage={setStage} />
-            </div>
+            <div className="deck-rail" style={{ transform: `translate3d(-${activeIndex * 100}%, 0, 0)` }}>
+              {/* SLIDE 1 — compact hero + GRPR leaderboard */}
+              <section
+                className="deck-slide"
+                data-section="leaderboard"
+                role="group"
+                aria-roledescription="slide"
+                aria-label="Step 1 of 4 — GRPR leaderboard"
+                aria-hidden={active !== "leaderboard"}
+              >
+                <div className="deck-slide-inner">
+                  <div className="deck-hero">
+                    <span className="grounded-pill">
+                      <Dot /> Derived from Le Kyoto&apos;s real Google reviews
+                    </span>
+                    <h1 className="deck-hero-title">One review → a grounded recovery package</h1>
+                    <p className="deck-hero-sub">
+                      On <strong>{report.dataset.n}</strong> held-out cases — solo given ≥ the team&apos;s compute — the
+                      multi-agent team lifts <strong>GRPR</strong>
+                      {soloRow && teamRow ? (
+                        <>
+                          {" "}from <strong>{pct(soloRow.grpr)}</strong> to <strong>{pct(teamRow.grpr)}</strong>
+                          {mem.soloToTeam !== null ? ` (+${mem.soloToTeam} pts)` : ""}
+                        </>
+                      ) : null}
+                      .{" "}
+                      {mem.memoryHelps === "up"
+                        ? `Across-run memory adds another +${mem.teamToMemory} pts.`
+                        : mem.memoryHelps === "down"
+                          ? `Across-run memory did not help this run (${mem.teamToMemory} pts on the held-out slice) — the self-improvement that holds is the Verifier driving the Writer’s v1→v2 rewrite.`
+                          : "The self-improvement you can watch live is the Verifier driving the Writer’s v1→v2 rewrite; across-run memory is neutral on this slice."}{" "}
+                      Every claim is traced to the query that proves it in Weave.
+                    </p>
+                    {banner && (
+                      <p className="deck-hero-banner" style={{ color: banner.tone }}>
+                        {banner.text}
+                      </p>
+                    )}
+                  </div>
+                  <RecoveryLeaderboard rows={report.rows} dataset={report.dataset} />
+                  <footer className="deck-footer">
+                    Traced in <strong>W&amp;B Weave</strong> · project <code>{WEAVE_PROJECT}</code>. CLI:{" "}
+                    <code>pnpm recovery</code>. The headline GRPR is mechanical (checkGrounding + deterministic
+                    triage/ticket) — no LLM judge.
+                  </footer>
+                </div>
+              </section>
 
-            <div ref={sections.drilldown} data-section="drilldown" className="recovery-section">
-              <RecoveryCaseDrilldown c={report.sampleCase} />
-            </div>
+              {/* SLIDE 2 — the brigade theater (stays mounted → its animation/replay state survives) */}
+              <section
+                className="deck-slide"
+                data-section="theater"
+                role="group"
+                aria-roledescription="slide"
+                aria-label="Step 2 of 4 — The brigade"
+                aria-hidden={active !== "theater"}
+              >
+                <div className="deck-slide-inner deck-slide-inner--wide">
+                  <AgentTheater sampleCase={report.sampleCase} runNonce={runNonce} onStage={setStage} />
+                </div>
+              </section>
 
-            <div ref={sections.approvals} data-section="approvals" className="recovery-section">
-              <RecoveryHITL reply={report.sampleCase.team.reply} ticket={ticket} state={hitl} onDecide={decide} />
-            </div>
+              {/* SLIDE 3 — case drill-down (solo fail vs team pass + memory reuse) */}
+              <section
+                className="deck-slide"
+                data-section="drilldown"
+                role="group"
+                aria-roledescription="slide"
+                aria-label="Step 3 of 4 — Case drill-down"
+                aria-hidden={active !== "drilldown"}
+              >
+                <div className="deck-slide-inner deck-slide-inner--wide">
+                  <RecoveryCaseDrilldown c={report.sampleCase} />
+                </div>
+              </section>
 
-            <footer style={{ color: "var(--muted)", fontSize: 13, marginTop: 6 }}>
-              Traced in <strong>W&amp;B Weave</strong> · project <code>{WEAVE_PROJECT}</code>. CLI:{" "}
-              <code>pnpm recovery</code>. The headline GRPR is mechanical (checkGrounding + deterministic
-              triage/ticket) — no LLM judge.
-            </footer>
+              {/* SLIDE 4 — HITL approvals */}
+              <section
+                className="deck-slide"
+                data-section="approvals"
+                role="group"
+                aria-roledescription="slide"
+                aria-label="Step 4 of 4 — Approvals"
+                aria-hidden={active !== "approvals"}
+              >
+                <div className="deck-slide-inner">
+                  <RecoveryHITL reply={report.sampleCase.team.reply} ticket={ticket} state={hitl} onDecide={decide} />
+                </div>
+              </section>
+            </div>
           </div>
         </div>
       </div>
     </CopilotLayer>
+  );
+}
+
+/**
+ * Audit Copilot switch — a pill switch in the top bar (matches ThemeToggle's shape). ON mounts the
+ * CopilotKit sidebar; OFF hides it entirely. Local state only; no persistence (see RecoveryPage).
+ */
+function AuditToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      role="switch"
+      aria-checked={on}
+      aria-label="Audit Copilot"
+      title={on ? "Audit Copilot is on — click to hide the sidebar" : "Audit Copilot is off — click to show the sidebar"}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        height: 34,
+        padding: "0 12px 0 13px",
+        borderRadius: 999,
+        border: "1px solid var(--border)",
+        background: "transparent",
+        color: on ? "var(--text)" : "var(--muted)",
+        cursor: "pointer",
+        fontSize: 12.5,
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>
+        🤖
+      </span>
+      <span>Audit Copilot</span>
+      <span
+        aria-hidden
+        style={{
+          position: "relative",
+          width: 30,
+          height: 16,
+          borderRadius: 999,
+          background: on ? "var(--accent)" : "var(--border)",
+          transition: "background 140ms ease",
+          flex: "none",
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            top: 2,
+            left: on ? 16 : 2,
+            width: 12,
+            height: 12,
+            borderRadius: 999,
+            background: on ? "var(--accent-fg)" : "var(--muted)",
+            transition: "left 140ms ease",
+          }}
+        />
+      </span>
+    </button>
   );
 }
 
