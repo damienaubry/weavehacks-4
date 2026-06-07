@@ -19,7 +19,11 @@ export type Station =
   | "content"
   | "reviews"
   | "critic"
-  | "forge";
+  | "forge"
+  | "curator"
+  | "analyst"
+  | "writer"
+  | "verifier";
 
 export interface RoleManifest {
   id: Station;
@@ -32,11 +36,58 @@ export interface RoleManifest {
   conflictsWith: { with: Station | "human"; over: string }[];
   /** does its output touch money or public reputation? → HITL, never auto-apply */
   sensitive: boolean;
-  /** build priority */
-  tier: "hero" | "breadth" | "coda";
+  /** build priority. "legacy" = the Friday-prep team, kept runnable but not the judged product. */
+  tier: "hero" | "breadth" | "coda" | "legacy";
 }
 
 export const AGENT_ROLES: RoleManifest[] = [
+  // ─── HERO: the Grounded Recovery Copilot (review → grounded reply + internal ticket) ───
+  {
+    id: "curator",
+    name: "Evidence Curator",
+    does: "Pulls ONLY authorized sources for a review — review text, aggregated POS window, menu + policy facts.",
+    authority: 55,
+    conflictsWith: [
+      { with: "analyst", over: "supplies the evidence the Analyst must reason over; refuses unauthorized context" },
+      { with: "writer", over: "the reply may use ONLY facts in the curated ledger" },
+    ],
+    sensitive: false,
+    tier: "hero",
+  },
+  {
+    id: "analyst",
+    name: "Operational Analyst",
+    does: "Infers the incident type (triage) and assembles an atomic-fact, cited evidence ledger.",
+    authority: 58,
+    conflictsWith: [
+      { with: "writer", over: "pushes specificity + grounding against the Writer's pull toward fluency" },
+      { with: "curator", over: "what evidence is actually available vs what the reply needs" },
+    ],
+    sensitive: false,
+    tier: "hero",
+  },
+  {
+    id: "writer",
+    name: "Writer",
+    does: "Drafts the public reply + internal ticket FROM THE LEDGER ONLY.",
+    authority: 30,
+    conflictsWith: [{ with: "verifier", over: "wants to ship; the Verifier blocks until every claim is grounded + policy-safe" }],
+    sensitive: true, // a public reply is reputation + a gesture can be money → HITL
+    tier: "hero",
+  },
+  {
+    id: "verifier",
+    name: "Adversarial Verifier",
+    does: "Challenges the draft: unsupported claim? policy violation? over-promise? Blocks until grounded.",
+    authority: 90,
+    conflictsWith: [
+      { with: "writer", over: "blocks any claim not backed by the ledger / any policy breach or over-promise" },
+      { with: "human", over: "escalates a gesture that touches money/reputation for approval" },
+    ],
+    sensitive: false,
+    tier: "hero",
+  },
+  // ─── LEGACY hero (kept runnable: pnpm grounding / pnpm prep) ───
   {
     id: "critic",
     name: "Critic",
@@ -47,7 +98,7 @@ export const AGENT_ROLES: RoleManifest[] = [
       { with: "prep", over: "rejects demand numbers not traceable to POS/weather" },
     ],
     sensitive: false,
-    tier: "hero",
+    tier: "legacy",
   },
   {
     id: "content",
@@ -56,7 +107,7 @@ export const AGENT_ROLES: RoleManifest[] = [
     authority: 30,
     conflictsWith: [{ with: "critic", over: "wants to ship; Critic wants it grounded + specific" }],
     sensitive: true, // a published post is public reputation → HITL
-    tier: "hero",
+    tier: "legacy",
   },
   {
     id: "historian",
@@ -65,7 +116,7 @@ export const AGENT_ROLES: RoleManifest[] = [
     authority: 55,
     conflictsWith: [{ with: "scout", over: "its baseline average vs the Scout's claim that today is atypical" }],
     sensitive: false,
-    tier: "hero",
+    tier: "legacy",
   },
   {
     id: "scout",
@@ -74,7 +125,7 @@ export const AGENT_ROLES: RoleManifest[] = [
     authority: 58,
     conflictsWith: [{ with: "historian", over: "today's specific conditions vs the historical average" }],
     sensitive: false,
-    tier: "hero",
+    tier: "legacy",
   },
   {
     id: "prep",
@@ -87,7 +138,7 @@ export const AGENT_ROLES: RoleManifest[] = [
       { with: "critic", over: "every demand number must trace to a tool result" },
     ],
     sensitive: false,
-    tier: "hero",
+    tier: "legacy",
   },
   {
     id: "chef",
@@ -96,7 +147,7 @@ export const AGENT_ROLES: RoleManifest[] = [
     authority: 80,
     conflictsWith: [{ with: "human", over: "escalates money/reputation changes for approval" }],
     sensitive: false,
-    tier: "hero",
+    tier: "legacy",
   },
   {
     id: "promo",

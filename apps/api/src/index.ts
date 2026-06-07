@@ -2,6 +2,7 @@ import http from "node:http";
 import { loadRootEnv } from "@weavehacks/shared";
 import { healthReport } from "./health";
 import { runCompare } from "./compare";
+import { runRecovery } from "./recovery";
 
 loadRootEnv();
 
@@ -29,13 +30,18 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify(board, null, 2));
       return;
     }
+    if (url === "/recovery") {
+      const report = await runRecovery();
+      res.end(JSON.stringify(report, null, 2));
+      return;
+    }
     if (url === "/" || url === "") {
       res.end(
         JSON.stringify(
           {
             name: "Brigade · orchestration runtime",
-            project: "Brigade — multi-agent restaurant ops for Le Kyoto (see CLAUDE.md)",
-            endpoints: ["/health", "/compare"],
+            project: "Grounded Recovery Copilot for Le Kyoto (see CLAUDE.md)",
+            endpoints: ["/health", "/compare", "/recovery"],
           },
           null,
           2,
@@ -52,5 +58,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[api] orchestration runtime on http://localhost:${PORT}  (/, /health, /compare)`);
+  console.log(`[api] orchestration runtime on http://localhost:${PORT}  (/, /health, /compare, /recovery)`);
 });

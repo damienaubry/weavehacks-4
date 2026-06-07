@@ -18,6 +18,8 @@
     "prep": "pnpm --filter @weavehacks/api prep",
     "baseline": "pnpm --filter @weavehacks/api baseline",
     "compare": "pnpm --filter @weavehacks/api compare",
+    "grounding": "pnpm --filter @weavehacks/api grounding",
+    "recovery": "pnpm --filter @weavehacks/api recovery",
     "demo": "pnpm --filter @weavehacks/api demo",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\" --ignore-path .gitignore"
   },

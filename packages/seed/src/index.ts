@@ -19,6 +19,10 @@ export { FIXTURES } from "./fixtures";
 export { HOLIDAYS } from "./holidays";
 export { EVENTS } from "./events";
 
+// Review-recovery dataset contract + placeholder cases (WS-A expands from real reviews).
+export * from "./recovery-types";
+export { RECOVERY_CASES } from "./recovery-cases";
+
 import { ORDERS } from "./orders";
 import { REVIEWS } from "./reviews";
 import { WEATHER } from "./weather";

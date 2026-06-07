@@ -77,3 +77,22 @@ export {
   type Budget,
   type GroundingComparison,
 } from "./grounding";
+
+// RECOVERY (hero pivot) — contracts the recovery workstreams code against. Implementations
+// (recovery-stations / recovery-score) land in WS-B and WS-C; these types are the Phase-0 socle.
+export type {
+  RecoveryVariant,
+  RecoveryOutput,
+  CaseScore,
+  RecoveryRunResult,
+  RecoveryReport,
+} from "./recovery-contract";
+
+// FAILURE-CARD MEMORY (Layer 2) — in-memory stub; WS-D promotes to packages/memory + Redis.
+export {
+  writeFailureCard,
+  retrieveFailureCards,
+  __resetMemory,
+  type FailureCard,
+  type RetrieveQuery,
+} from "./memory";
