@@ -352,9 +352,9 @@ export const pct = (n: number) => `${Math.round(n * 100)}%`;
 export const STAGED_RECOVERY: RecoveryReport = {
   dataset: { n: 16, realCount: 9, syntheticCount: 7 },
   rows: [
-    { variant: "solo", grpr: 0.6, budgetTokens: 224794, budgetCalls: 129 },
+    { variant: "solo", grpr: 0.8, budgetTokens: 224794, budgetCalls: 129 },
     { variant: "team", grpr: 0.9, budgetTokens: 150975, budgetCalls: 100 },
-    { variant: "team+memory", grpr: 1.0, budgetTokens: 90804, budgetCalls: 61 },
+    { variant: "team+memory", grpr: 0.8, budgetTokens: 90804, budgetCalls: 61 },
   ],
   sampleCase: {
     id: "rc-real-025",

@@ -2,11 +2,30 @@
 
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 
+import { STAGED_RECOVERY, pct, type RecoveryVariant } from "../lib/recovery";
+
 /*
  * /demo — the 3-minute pitch deck. Self-contained: dark theme baked in (ignores the
  * app's light/dark toggle), no API calls, all content static from docs/pitch-deck.md.
  * Horizontal slides; ←/→ (or click left/right edge) to navigate; Esc → first slide.
+ *
+ * SINGLE SOURCE OF TRUTH: every leaderboard number on this deck is DERIVED from the same
+ * `STAGED_RECOVERY` constant the /recovery page falls back to — itself a verbatim mirror of
+ * recovery-report.json. So /demo and /recovery can never contradict each other: change the
+ * report (and the staged mirror) and both surfaces move together. No standalone literals.
  */
+
+// ── Numbers, derived from the shared RecoveryReport (NOT hardcoded) ─────────────
+const ROW = (v: RecoveryVariant) => STAGED_RECOVERY.rows.find((r) => r.variant === v)!;
+const SOLO = ROW("solo");
+const TEAM = ROW("team");
+const MEM = ROW("team+memory");
+/** "224794" → "225K" — the deck's compact token format, applied once to the real figure. */
+const fmtK = (n: number) => `${Math.round(n / 1000)}K`;
+const GRPR = { solo: pct(SOLO.grpr), team: pct(TEAM.grpr), mem: pct(MEM.grpr) };
+const TOK = { solo: fmtK(SOLO.budgetTokens), team: fmtK(TEAM.budgetTokens), mem: fmtK(MEM.budgetTokens) };
+const DS = STAGED_RECOVERY.dataset;
+const SAMPLE = STAGED_RECOVERY.sampleCase;
 
 // ── palette ──────────────────────────────────────────────────────────────────
 const BG = "#0a0a0a";
@@ -150,6 +169,11 @@ function Slide1() {
             <span style={{ color: GREEN, fontWeight: 600 }}>30 real</span> Google reviews +{" "}
             <span style={{ color: CYAN, fontWeight: 600 }}>18 synthetic</span> edge cases to
             stress-test.
+            <div style={{ color: MUTED, fontSize: 13, marginTop: 8 }}>
+              Scored on a held-out slice of{" "}
+              <span style={{ color: TEXT, fontWeight: 600 }}>{DS.n} cases</span> ({DS.realCount} real ·{" "}
+              {DS.syntheticCount} synthetic).
+            </div>
           </div>
         </div>
       </div>
@@ -198,7 +222,7 @@ function Slide2() {
         {/* OUTPUT */}
         <div style={{ display: "grid", gap: 12 }}>
           <OutputRow n="1" label="TRIAGE" color={CYAN}>
-            <code style={{ fontFamily: MONO, color: CYAN }}>wrong_or_missing_item</code>
+            <code style={{ fontFamily: MONO, color: CYAN }}>{SAMPLE.incidentTypeGold}</code>
           </OutputRow>
           <OutputRow n="2" label="PUBLIC REPLY" color={GREEN}>
             “We&apos;d like to offer you a <b>10€ credit</b> on your next order.”
@@ -260,34 +284,37 @@ function Slide3() {
       tier: "SOLO AGENT",
       note: "fails",
       color: RED,
-      score: "80%",
+      score: GRPR.solo,
       icon: "❌",
       quote: "states “missing items in the order”…",
-      lines: ["→ No tool result backs that claim. UNGROUNDED.", "→ 225K tokens spent. Still fails one check."],
-      tokens: "225K tokens",
+      lines: ["→ No tool result backs that claim. UNGROUNDED.", `→ ${TOK.solo} tokens spent. Still fails one check.`],
+      tokens: `${TOK.solo} tokens`,
     },
     {
       tier: "TEAM",
       note: "passes",
       color: GREEN,
-      score: "90%",
+      score: GRPR.team,
       icon: "✅",
       quote: "every claim traced to a tool result.",
       lines: [
         "→ Verifier flags the ungrounded claim. BLOCKS.",
         "→ Writer rewrites — grounded. Now passes.",
       ],
-      tokens: "151K tokens — fewer than solo",
+      tokens: `${TOK.team} tokens — fewer than solo`,
     },
     {
       tier: "TEAM + MEMORY",
       note: "cheapest",
       color: CYAN,
-      score: "80%",
+      score: GRPR.mem,
       icon: "⚡",
       quote: "Same score as team — at the lowest cost.",
-      lines: ["→ Cross-run memory: 91K tokens, 61 calls.", "→ Honest result: 80% — did not beat team here."],
-      tokens: "91K tokens — cheapest of all three",
+      lines: [
+        `→ Cross-run memory: ${TOK.mem} tokens, ${MEM.budgetCalls} calls.`,
+        `→ Honest result: ${GRPR.mem} — did not beat team here.`,
+      ],
+      tokens: `${TOK.mem} tokens — cheapest of all three`,
     },
   ];
   return (
@@ -352,6 +379,21 @@ function Slide3() {
           </div>
         ))}
       </div>
+
+      <div
+        style={{
+          marginTop: "clamp(12px, 2.2vh, 22px)",
+          color: MUTED,
+          fontSize: "clamp(12px, 1.2vw, 15px)",
+          lineHeight: 1.55,
+          maxWidth: "92ch",
+        }}
+      >
+        On this small held-out slice cross-run memory didn&apos;t beat team (it changes the
+        Writer&apos;s input, not just its cost); we expect it to help at larger N — we don&apos;t claim
+        it here. The self-improvement we show is the within-session{" "}
+        <span style={{ color: GREEN }}>Verifier-driven v1→v2 rewrite</span>.
+      </div>
     </SlideFrame>
   );
 }
@@ -382,7 +424,7 @@ function Slide4() {
           <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", lineHeight: 1.9, color: RED }}>
             <li>❌ Never told WHAT is wrong</li>
             <li>❌ “Be warmer” = be more generous = worse</li>
-            <li>❌ More tokens (225K), still fails one check</li>
+            <li>❌ More tokens ({TOK.solo}), still fails one check</li>
           </ul>
         </div>
 
@@ -396,7 +438,7 @@ function Slide4() {
           <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", lineHeight: 1.9, color: GREEN }}>
             <li>✅ Knows EXACTLY what to fix</li>
             <li>✅ One rewrite, done</li>
-            <li>✅ Targeted fix (151K tokens), passes</li>
+            <li>✅ Targeted fix ({TOK.team} tokens), passes</li>
           </ul>
         </div>
       </div>
@@ -418,7 +460,7 @@ function Slide5() {
     { text: "│   ├── tool.policy_lookup ✓", color: GREEN, indent: 0 },
     { text: "│   └── tool.get_menu ✓", color: GREEN, indent: 0 },
     { text: "├── agent.analyst", indent: 0 },
-    { text: "│   └── triage: wrong_or_missing_item ✓", color: CYAN, indent: 0 },
+    { text: `│   └── triage: ${SAMPLE.incidentTypeGold} ✓`, color: CYAN, indent: 0 },
     { text: "├── agent.writer", indent: 0 },
     { text: "│   └── draft v1: ungrounded claim ⚠️", color: AMBER, indent: 0 },
     { text: "├── agent.verifier", indent: 0 },
@@ -588,16 +630,16 @@ function Slide8() {
         <div style={{ ...card, fontFamily: MONO }}>
           <div style={{ color: MUTED, marginBottom: 14 }}>$ pnpm recovery</div>
           <Terminal rows={[
-            ["solo", "80%", "225K tokens", MUTED],
-            ["team", "90%", "151K tokens", GREEN],
-            ["team+mem", "80%", "91K tokens", CYAN],
+            ["solo", GRPR.solo, `${TOK.solo} tokens`, MUTED],
+            ["team", GRPR.team, `${TOK.team} tokens`, GREEN],
+            ["team+mem", GRPR.mem, `${TOK.mem} tokens`, CYAN],
           ]} />
         </div>
 
         <div style={{ ...card, fontFamily: MONO, borderColor: "rgba(248,113,113,0.45)" }}>
           <div style={{ color: MUTED, marginBottom: 14 }}>$ pnpm recovery --no-verifier</div>
           <Terminal rows={[
-            ["solo", "80%", "", MUTED],
+            ["solo", GRPR.solo, "", MUTED],
             ["team", "↓", "← collapses toward solo", RED],
             ["team+mem", "↓", "← collapses toward solo", RED],
           ]} />

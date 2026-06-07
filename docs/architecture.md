@@ -131,7 +131,7 @@ there are no baked-in values.
   The store is reset before the team+memory pass and warmed only in chronological order (no leakage;
   `split.ts` provides `chronologicalSplit` / `auditLeakage` / `assertNoLeakage`). **Honesty guard:** the
   harness's `HonestComparison` reports whether memory beat team *cleanly*; if not, it says so and
-  falls back to the Layer-1 v1→v2 rescue count. (On the captured fast slice it did **not** — 80% < 100%
+  falls back to the Layer-1 v1→v2 rescue count. (On the captured judged run it did **not** — 80% < 90%
   — so we report the within-session rewrite instead.) Never inflate.
 - **Layer 3 — lifetime [coda]:** Forge spawns new agents. Stretch only (not built).
 
@@ -145,8 +145,8 @@ Google reviews (majority `source:"real"`, the target met) + 18 clearly-marked sy
 the rarer incident types (Le Kyoto is genuinely 4.7★, so the harshest cases are mostly synthetic —
 presented honestly). The fast demo slice is **8 cases**, the judged run **16** — both just point
 `RECOVERY_CASES_PATH` at a smaller JSON (`recovery-cases.fast.json` / `.demo.json`); the harness has no
-case cap. Real captured result (fast slice, `recovery-report.json`): **solo 60% < team 100%**, solo on
-nearly 2× the tokens (117,830 vs 65,197) — the gap is the Verifier; `team+memory` was neutral on this
-small slice (80%). Menu/prices/hours and the policy gesture limits remain demo-plausible placeholders
+case cap. Real captured result (judged 16-case run, `recovery-report.json`): **solo 80% < team 90%**, solo on
+~1.5× the tokens (224,794 vs 150,975) — the gap is the Verifier; `team+memory` did not beat team on this
+slice (80%). Menu/prices/hours and the policy gesture limits remain demo-plausible placeholders
 pending operator validation (the shape is locked). See [`repo-audit.md`](repo-audit.md) for the
 file-by-file split.

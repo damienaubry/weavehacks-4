@@ -28,8 +28,8 @@ and `pnpm grounding` (legacy) still run.
 
 > **The dataset is real-derived and complete:** 48 cases — **30 verbatim from Le Kyoto's real Google
 > reviews** (majority `source:"real"`, the target met) + 18 clearly-marked synthetic variants for the
-> rarer incident types. Captured real result (fast 8-case slice, `recovery-report.json`): **solo 60% <
-> team 100%**, solo on nearly 2× the tokens — the gap is the Verifier, not compute. Menu/prices/hours
+> rarer incident types. Captured real result (judged 16-case run, `recovery-report.json`): **solo 80% <
+> team 90%**, solo on ~1.5× the tokens — the gap is the Verifier, not compute. Menu/prices/hours
 > and the policy gesture limits remain demo-plausible placeholders pending operator validation (the
 > SHAPE is locked, the values are swappable).
 

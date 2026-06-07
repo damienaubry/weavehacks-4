@@ -44,22 +44,22 @@ every claim traced to the query that proves it in Weave."_
 
 ## The real result
 
-The fast 8-case slice (held-out, matched compute), captured in `recovery-report.json`:
+The judged 16-case run (held-out, matched compute), captured in `recovery-report.json`:
 
 ```
-solo         GRPR  60%   ·  117,830 tok / 65 calls
-team         GRPR 100%   ·   65,197 tok / 45 calls   ← +40 pts on nearly HALF the tokens
-team+memory  GRPR  80%   ·   55,164 tok / 34 calls   (cross-run memory; neutral on this small slice)
+solo         GRPR  80%   ·  224,794 tok / 129 calls
+team         GRPR  90%   ·  150,975 tok / 100 calls   ← +10 pts on FEWER tokens
+team+memory  GRPR  80%   ·   90,804 tok /  61 calls   (cross-run memory; did not beat team on this slice)
 ```
 
-Solo spent **nearly 2× the tokens** and still scored lower — the per-case parity guard confirms the
-gap is the **Verifier**, not compute. The real sample case is a **1★ Google review** `rc-real-088`
-(_"Very average and tasteless… I do not recommend!"_): the **solo offers a 20% discount** →
-`gesture 20% exceeds the 15% credit limit [over_promise]` → **FAIL**; the **team offers a 15% credit**
-→ **PASS**. The rows above are the **fast iteration slice** (gpt-4o-mini, 8 cases); the **judged run is
-a separate, larger pass — 16 cases on W&B Inference** (`recovery-cases.demo.json`), same harness, same
-three variants, same model — the more robust number. **Honest caveat, baked in:** cross-run memory did
-*not* beat team on this slice (80% < 100%) — the defensible self-improvement is the Verifier's
+Solo spent **~1.5× the team's tokens** and still scored lower — the per-case parity guard confirms the
+gap is the **Verifier**, not compute. The real sample case is a **2★ Google review** `rc-real-025`
+(_"Inadmissible, il manque la moitié de la commande"_, gold `wrong_or_missing_item`): the **solo ships
+an ungrounded claim** (_"missing items in the order"_, not backed by any tool result) → **FAIL**; the
+**team grounds every claim and stays within policy** → **PASS**. These are the **judged 16 cases on
+W&B Inference** (`recovery-cases.demo.json`); we iterated on a cheaper 8-case slice (gpt-4o-mini) but
+the number we show is this larger, more robust pass. **Honest caveat, baked in:** cross-run memory did
+*not* beat team on this slice (80% < 90%) — the defensible self-improvement is the Verifier's
 within-session v1→v2 rewrite, and the CLI prints that verdict for us to read aloud.
 
 ## The hero loop
@@ -78,8 +78,8 @@ HITL     a human approves the public reply + ticket before anything is published
 
 The live **v1 → v2 rewrite** makes the jump legible; the GRPR makes it measurable. The pre-rewrite
 draft (`draftV1`) and both verdicts are kept on every run for the drill-down. (The diagram is the
-mechanism; the live demo drills into the **real** case `rc-real-088` above — solo 20% over-promise vs
-team 15% credit. See [`docs/demo-script.md`](docs/demo-script.md).)
+mechanism; the live demo drills into the **real** case `rc-real-025` above — solo ships an ungrounded
+claim vs team grounds every claim. See [`docs/demo-script.md`](docs/demo-script.md).)
 
 ## Real data, real operator
 
@@ -137,8 +137,8 @@ you choose. **Weave degrades to a no-op without `WANDB_API_KEY`** (the spine sti
 
 1. `pnpm recovery` prints three rows with a **budget column** (`GET /recovery` serves the same numbers
    from the cache) — the CLI's per-case parity guard asserts solo spent ≥ each team variant, so the gap
-   is the Verifier's, not extra budget. On the fast slice: solo 60% on 117,830 tok vs team 100% on
-   65,197 tok.
+   is the Verifier's, not extra budget. On the judged 16-case run: solo 80% on 224,794 tok vs team 90%
+   on 150,975 tok.
 2. Open the Weave traces: each station is an op (`agent.recovery.*`), each case is `recovery.case`,
    each score is `recovery.score` — so every claim links to the query that grounds it.
 3. `pnpm recovery --no-verifier` → watch the GRPR collapse toward solo.
