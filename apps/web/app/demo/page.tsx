@@ -213,7 +213,7 @@ function Slide2() {
             ★★☆☆☆
           </div>
           <div style={{ fontFamily: MONO, fontSize: 15, color: TEXT, lineHeight: 1.5 }}>
-            “Inadmissible, il manque la moitié de la commande !”
+            “Unacceptable — half the order is missing!”
           </div>
         </div>
 

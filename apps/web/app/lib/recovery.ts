@@ -359,17 +359,17 @@ export const STAGED_RECOVERY: RecoveryReport = {
   sampleCase: {
     id: "rc-real-025",
     review:
-      "Inadmissible, nous venons de commander et il manque la moitié de la commandeCe n’est pas normal",
+      "Unacceptable — we just ordered and half the order is missing. This isn't right.",
     incidentTypeGold: "wrong_or_missing_item",
     solo: {
       reply:
-        "Bonjour, je suis vraiment désolé d'apprendre que votre commande était incomplète. C'est inacceptable et je comprends parfaitement votre frustration. Nous nous efforçons de fournir un service de qualité, et il est clair que nous avons échoué cette fois-ci. Pour rectifier cela, je vous propose un crédit de 15% sur votre prochaine commande, jusqu'à un maximum de 10 euros, afin de vous donner une chance de mieux nous connaître. Votre satisfaction est très importante pour nous, et nous espérons que vous nous donnerez une autre occasion de vous impressionner. Si vous avez d'autres préoccupations ou si vous souhaitez discuter de votre expérience, n'hésitez pas à nous contacter directement. Merci de votre compréhension et de votre patience !",
+        "Hello, I'm truly sorry to hear that your order was incomplete. This is unacceptable and I completely understand your frustration. We strive to provide quality service, and it's clear that we fell short this time. To make this right, I'd like to offer you a 15% credit on your next order, up to a maximum of 10 euros, to give you a chance to get to know us better. Your satisfaction is very important to us, and we hope you'll give us another opportunity to impress you. If you have any other concerns or would like to discuss your experience, please don't hesitate to contact us directly. Thank you for your understanding and your patience!",
       pass: false,
-      failReasons: ["claim non sourcée : « missing items in the order » (1)"],
+      failReasons: ["unsupported claim: « missing items in the order » (1)"],
     },
     team: {
       reply:
-        "Bonjour, \n\nNous sommes vraiment désolés d'apprendre que votre commande était incomplète. Ce n'est pas l'expérience que nous souhaitons offrir à nos clients. Nous comprenons à quel point cela peut être frustrant et nous vous remercions de nous en avoir informés.\n\nPour compenser cette situation, nous aimerions vous offrir un crédit de 10€ sur votre prochaine commande. Nous espérons que cela vous encouragera à nous donner une autre chance de vous servir comme il se doit.\n\nMerci encore pour votre compréhension, et nous espérons vous revoir bientôt !\n\nCordialement, \nL'équipe de Le Kyoto",
+        "Hello,\n\nWe're truly sorry to hear that your order was incomplete. This isn't the experience we want to give our customers. We understand how frustrating this can be, and we thank you for letting us know.\n\nTo make up for this, we'd like to offer you a 10€ credit on your next order. We hope this will encourage you to give us another chance to serve you as you deserve.\n\nThank you again for your understanding, and we hope to see you again soon!\n\nKind regards,\nThe Le Kyoto team",
       pass: true,
     },
   },

@@ -38,7 +38,11 @@ import type { RecoveryReport } from "@weavehacks/agents";
 
 loadRootEnv();
 
-const CACHE_PATH = process.env.RECOVERY_REPORT_CACHE ?? join(tmpdir(), "weavehacks-recovery-report.json");
+// Default to the repo's canonical, frozen report (apps/api/src → repo root) so GET /recovery always
+// serves the good 80/90/80 run — NOT a noisy temp cache a stray `pnpm recovery` may have written.
+// Turbo strips RECOVERY_REPORT_CACHE from the task env, so relying on the env var alone was unreliable.
+const REPO_REPORT = join(fileURLToPath(new URL(".", import.meta.url)), "..", "..", "..", "recovery-report.json");
+const CACHE_PATH = process.env.RECOVERY_REPORT_CACHE ?? (existsSync(REPO_REPORT) ? REPO_REPORT : join(tmpdir(), "weavehacks-recovery-report.json"));
 const baseModel = (): RecoveryModels => (process.env.RECOVERY_MODEL ? { base: process.env.RECOVERY_MODEL } : {});
 const judgeModel = (): string | undefined => process.env.RECOVERY_JUDGE_MODEL || undefined;
 
